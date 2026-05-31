@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\tom20\Desktop\noson-2.12.24\build_vc\CMakeFiles\4a0f8e930ff26f91772f3d3caf55d349\Experimental.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\tom20\Desktop\noson-2.12.24\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\tom20\Desktop\noson-2.12.24\build_vc\CMakeFiles\Experimental" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{355CE400-972B-3210-B376-F89D7A5DBAEC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

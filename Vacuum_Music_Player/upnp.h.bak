@@ -1,0 +1,39 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <functional>
+#include <memory>
+
+struct UPnPDeviceInfo
+{
+    std::string uuid;
+    std::string friendlyName;
+    std::string location;   // 设备描述 XML 的 URL
+    std::string modelName;
+    std::string manufacturer;
+};
+
+class UPnPManager
+{
+public:
+    UPnPManager();
+    ~UPnPManager();
+
+    // 启动发现（非阻塞，内部线程）
+    bool StartDiscovery();
+
+    // 停止发现
+    void StopDiscovery();
+
+    // 获取当前已发现的设备列表
+    std::vector<UPnPDeviceInfo> GetDevices() const;
+
+    // 设置设备变化回调（可选）
+    void SetDeviceCallback(std::function<void(const UPnPDeviceInfo&, bool added)> callback);
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> m_impl;
+    bool m_running = false;
+};

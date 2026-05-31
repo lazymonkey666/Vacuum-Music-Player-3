@@ -1,0 +1,165 @@
+#include "upnp.h"
+#include <Platinum.h>
+#include <PltUPnP.h>
+#include <PltMediaController.h>
+#include <PltDeviceData.h>
+#include <functional>
+
+#pragma comment(lib, "Platinum.lib")
+#pragma comment(lib, "Neptune.lib")
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
+#pragma comment(lib, "rpcrt4.lib")
+
+#include <map>
+#include <mutex>
+#include <atomic>
+
+// ---------------------------------------------------------------------
+// 严格匹配头文件的委托类（重写正确的虚函数！）
+// ---------------------------------------------------------------------
+class MyMediaControllerDelegate : public PLT_MediaControllerDelegate
+{
+public:
+    MyMediaControllerDelegate() {}
+
+    void SetCallback(std::function<void(const UPnPDeviceInfo&, bool)> cb) {
+        m_callback = cb;
+    }
+
+    std::vector<UPnPDeviceInfo> GetDevices() const {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::vector<UPnPDeviceInfo> result;
+        for (const auto& pair : m_devices)
+            result.push_back(pair.second);
+        return result;
+    }
+
+    // ✅ 头文件规定的正确虚函数（不是OnDeviceAdded！）
+    bool OnMRAdded(PLT_DeviceDataReference& device) override {
+        if (device->GetType() != "urn:schemas-upnp-org:device:MediaRenderer:1")
+            return true;
+
+        UPnPDeviceInfo info;
+        info.uuid = (const char*)device->GetUUID();
+        info.friendlyName = (const char*)device->GetFriendlyName();
+        info.location = (const char*)device->GetDescriptionUrl();
+        info.modelName = (const char*)device->m_ModelName;
+        info.manufacturer = (const char*)device->m_Manufacturer;
+
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_devices[info.uuid] = info;
+        }
+
+        if (m_callback)
+            m_callback(info, true);
+        return true;
+    }
+
+    // ✅ 头文件规定的正确虚函数（不是OnDeviceRemoved！）
+    void OnMRRemoved(PLT_DeviceDataReference& device) override {
+        std::string uuid = (const char*)device->GetUUID();
+        UPnPDeviceInfo info;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            auto it = m_devices.find(uuid);
+            if (it != m_devices.end()) {
+                info = it->second;
+                m_devices.erase(it);
+            }
+        }
+        if (m_callback && !info.uuid.empty())
+            m_callback(info, false);
+    }
+
+    // 剩余虚函数空实现（匹配头文件）
+    void OnMRStateVariablesChanged(PLT_Service*, NPT_List<PLT_StateVariable*>*) override {}
+
+private:
+    mutable std::mutex m_mutex;
+    std::map<std::string, UPnPDeviceInfo> m_devices;
+    std::function<void(const UPnPDeviceInfo&, bool)> m_callback;
+};
+
+// ---------------------------------------------------------------------
+// UPnPManager 实现（严格匹配构造函数+智能指针规范）
+// ---------------------------------------------------------------------
+class UPnPManager::Impl
+{
+public:
+    Impl() : m_running(false) {}
+    ~Impl() { Stop(); }
+
+    bool Start() {
+        if (m_running) return true;
+
+        // 1. 创建UPnP核心
+        m_upnp = new PLT_UPnP();
+
+        // 2. 创建控制点智能指针（库强制要求）
+        PLT_CtrlPointReference ctrlPoint(new PLT_CtrlPoint());
+        m_upnp->AddCtrlPoint(ctrlPoint);
+
+        // 3. 创建委托
+        m_delegate = new MyMediaControllerDelegate();
+        if (m_callback)
+            m_delegate->SetCallback(m_callback);
+
+        // ✅ 核心修复：匹配头文件构造函数（智能指针 + 委托）
+        m_controller = new PLT_MediaController(ctrlPoint, m_delegate);
+
+        // 4. 启动UPnP
+        NPT_Result res = m_upnp->Start();
+        if (NPT_FAILED(res)) {
+            Stop();
+            return false;
+        }
+
+        m_running = true;
+        return true;
+    }
+
+    void Stop() {
+        if (!m_running) return;
+
+        if (m_upnp) {
+            m_upnp->Stop();
+            delete m_upnp;
+            m_upnp = nullptr;
+        }
+
+        delete m_controller;
+        delete m_delegate;
+        m_controller = nullptr;
+        m_delegate = nullptr;
+        m_running = false;
+    }
+
+    std::vector<UPnPDeviceInfo> GetDevices() const {
+        return m_delegate ? m_delegate->GetDevices() : std::vector<UPnPDeviceInfo>{};
+    }
+
+    void SetCallback(std::function<void(const UPnPDeviceInfo&, bool)> cb) {
+        m_callback = cb;
+        if (m_delegate) m_delegate->SetCallback(cb);
+    }
+
+private:
+    PLT_UPnP* m_upnp = nullptr;
+    PLT_MediaController* m_controller = nullptr;
+    MyMediaControllerDelegate* m_delegate = nullptr;
+    std::atomic<bool> m_running;
+    std::function<void(const UPnPDeviceInfo&, bool)> m_callback;
+};
+
+// ---------------------------------------------------------------------
+// 公开接口（不变）
+// ---------------------------------------------------------------------
+UPnPManager::UPnPManager() : m_impl(std::make_unique<Impl>()) {}
+UPnPManager::~UPnPManager() = default;
+
+bool UPnPManager::StartDiscovery() { return m_impl->Start(); }
+void UPnPManager::StopDiscovery() { m_impl->Stop(); }
+std::vector<UPnPDeviceInfo> UPnPManager::GetDevices() const { return m_impl->GetDevices(); }
+void UPnPManager::SetDeviceCallback(std::function<void(const UPnPDeviceInfo&, bool)> callback) { m_impl->SetCallback(callback); }

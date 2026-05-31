@@ -1,0 +1,28 @@
+# 忽略 Visual Studio 生成的用户和临时文件
+.vs/
+*.user
+*.suo
+
+# 忽略编译和中间输出目录
+Debug/
+Release/
+x64/
+x86/
+Bin/
+Obj/
+
+# 忽略个人配置文件（关键！）
+config.json
+
+# 忽略 CMake 的用户缓存目录（如果使用了 CMake）
+CMakeUserPresets.json
+CMakeSettings.json
+
+# 忽略 Windows 系统生成的临时文件
+Thumbs.db
+Desktop.ini
+
+# 其他可能的敏感文件或目录
+*.log
+*.tmp
+secrets.json

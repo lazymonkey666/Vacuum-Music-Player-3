@@ -1,0 +1,366 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\base64.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\builtin.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\byteorder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\compressor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\eventbroker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\jsonparser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\mainpagebroker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\pcmblankkiller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\ringbuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\securesocket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\socket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\tinyxml2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\upnpnotificationbroker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\uriparser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsreplychunked.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequest.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestbroker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestreply.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsresponse.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsstatic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\xmldict.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\data\datareader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarmclock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\avtransport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\contentdirectory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\deviceproperties.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\didlparser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\digitalitem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\eventhandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filepicreader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filestreamer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\imageservice.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\intrinsic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\iostream.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\locked.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\musicservices.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\renderingcontrol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\requestbroker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\service.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sharedptr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smaccount.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapimetadata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonosplayer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonossystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonostypes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonoszone.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscription.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscriptionpool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\zonegrouptopology.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\os\threads\threadpool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\os\threads\latch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\os\windows\winpthreads.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\base64.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\builtin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\byteorder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\compressor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\cppdef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\eventbroker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\jsonparser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\mainpagebroker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\pcmblankkiller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\ringbuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\sajson.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\securesocket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\socket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\tinyxml2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\tokenizer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\upnpnotificationbroker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\uriparser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\urlencoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsreplychunked.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestbroker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestreply.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsresponse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsstatic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\xmldict.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\data\datareader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarmclock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\audioencoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\audioformat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\audiosource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\avtransport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\contentdirectory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\deviceproperties.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\didlparser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\digitalitem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\element.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\eventhandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filepicreader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filestreamer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\imageservice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\intrinsic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\iostream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\locked.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\musicservices.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\renderingcontrol.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\requestbroker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\service.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sharedptr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smaccount.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapimetadata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonosplayer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonossystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonostypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonoszone.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\streamreader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscription.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscriptionpool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\zonegrouptopology.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{BA9143BB-2006-3398-9E0E-22529FB887AE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{0DDAB253-EA58-3AD3-82E2-C8716919ABC4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

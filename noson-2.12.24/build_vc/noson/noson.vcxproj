@@ -1,0 +1,441 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{4BC90272-0486-35BA-B5D7-F2000B5EB4A6}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>noson</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">noson.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">libnoson</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">noson.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">libnoson</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">noson.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">libnoson</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">noson.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">libnoson</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/tom20/Desktop/1/vcpkg/vcpkg/installed/x64-windows/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/tom20/Desktop/1/vcpkg/vcpkg/installed/x64-windows/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/tom20/Desktop/1/vcpkg/vcpkg/installed/x64-windows/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/tom20/Desktop/1/vcpkg/vcpkg/installed/x64-windows/include"</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public\noson;C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\public;C:\Users\tom20\Desktop\noson-2.12.24\noson\src;C:\Users\tom20\Desktop\1\vcpkg\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/tom20/Desktop/noson-2.12.24/noson/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\bin\cmake.exe -SC:/Users/tom20/Desktop/noson-2.12.24 -BC:/Users/tom20/Desktop/noson-2.12.24/build_vc --check-stamp-file C:/Users/tom20/Desktop/noson-2.12.24/build_vc/noson/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckFunctionExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindOpenSSL.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindThreads.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindZLIB.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\SelectLibraryConfigurations.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\CheckFunctionKeywords.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLAC.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLACXX.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse-simple.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\MSVCRuntime.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\src\local_config.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/tom20/Desktop/noson-2.12.24/noson/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\bin\cmake.exe -SC:/Users/tom20/Desktop/noson-2.12.24 -BC:/Users/tom20/Desktop/noson-2.12.24/build_vc --check-stamp-file C:/Users/tom20/Desktop/noson-2.12.24/build_vc/noson/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckFunctionExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindOpenSSL.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindThreads.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindZLIB.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\SelectLibraryConfigurations.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\CheckFunctionKeywords.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLAC.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLACXX.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse-simple.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\MSVCRuntime.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\src\local_config.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/tom20/Desktop/noson-2.12.24/noson/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\bin\cmake.exe -SC:/Users/tom20/Desktop/noson-2.12.24 -BC:/Users/tom20/Desktop/noson-2.12.24/build_vc --check-stamp-file C:/Users/tom20/Desktop/noson-2.12.24/build_vc/noson/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckFunctionExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindOpenSSL.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindThreads.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindZLIB.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\SelectLibraryConfigurations.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\CheckFunctionKeywords.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLAC.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLACXX.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse-simple.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\MSVCRuntime.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\src\local_config.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/tom20/Desktop/noson-2.12.24/noson/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\bin\cmake.exe -SC:/Users/tom20/Desktop/noson-2.12.24 -BC:/Users/tom20/Desktop/noson-2.12.24/build_vc --check-stamp-file C:/Users/tom20/Desktop/noson-2.12.24/build_vc/noson/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckFunctionExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindOpenSSL.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindThreads.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\FindZLIB.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\tom20\Desktop\1\cmake-4.2.3-windows-x86_64\share\cmake-4.2\Modules\SelectLibraryConfigurations.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\CheckFunctionKeywords.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLAC.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindFLACXX.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse-simple.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\FindPulse.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\cmake\MSVCRuntime.cmake;C:\Users\tom20\Desktop\noson-2.12.24\noson\src\local_config.h.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\tom20\Desktop\noson-2.12.24\build_vc\noson\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\base64.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\builtin.c" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\byteorder.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\compressor.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\debug.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\eventbroker.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\jsonparser.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\mainpagebroker.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\pcmblankkiller.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\ringbuffer.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\securesocket.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\socket.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\tinyxml2.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\upnpnotificationbroker.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\uriparser.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsreplychunked.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequest.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestbroker.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestreply.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsresponse.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsstatic.c" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\xmldict.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\data\datareader.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarmclock.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarm.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\avtransport.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\contentdirectory.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\deviceproperties.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\didlparser.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\digitalitem.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\eventhandler.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filepicreader.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filestreamer.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\imageservice.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\intrinsic.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\iostream.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\locked.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\musicservices.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\renderingcontrol.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\requestbroker.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\service.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sharedptr.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smaccount.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapi.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapimetadata.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonosplayer.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonossystem.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonostypes.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonoszone.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscription.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscriptionpool.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\zonegrouptopology.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\os\threads\threadpool.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\os\threads\latch.cpp" />
+    <ClCompile Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\os\windows\winpthreads.c" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\base64.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\builtin.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\byteorder.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\compressor.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\cppdef.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\debug.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\eventbroker.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\jsonparser.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\mainpagebroker.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\pcmblankkiller.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\ringbuffer.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\sajson.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\securesocket.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\socket.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\tinyxml2.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\tokenizer.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\upnpnotificationbroker.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\uriparser.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\urlencoder.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsreplychunked.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequest.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestbroker.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsrequestreply.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsresponse.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\wsstatic.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\private\xmldict.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\data\datareader.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarmclock.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\alarm.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\audioencoder.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\audioformat.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\audiosource.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\avtransport.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\contentdirectory.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\deviceproperties.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\didlparser.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\digitalitem.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\element.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\eventhandler.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filepicreader.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\filestreamer.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\imageservice.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\intrinsic.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\iostream.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\locked.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\musicservices.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\renderingcontrol.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\requestbroker.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\service.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sharedptr.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smaccount.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapi.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\smapimetadata.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonosplayer.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonossystem.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonostypes.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\sonoszone.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\streamreader.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscription.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\subscriptionpool.h" />
+    <ClInclude Include="C:\Users\tom20\Desktop\noson-2.12.24\noson\src\zonegrouptopology.h" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\tom20\Desktop\noson-2.12.24\build_vc\ZERO_CHECK.vcxproj">
+      <Project>{6F47CEE5-6DA1-327C-B3A5-F4246D7AB659}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
