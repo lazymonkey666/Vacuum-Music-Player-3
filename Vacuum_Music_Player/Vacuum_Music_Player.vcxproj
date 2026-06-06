@@ -123,6 +123,13 @@
 ;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;%(AdditionalDependencies);windowsapp.lib;tag.lib;tag.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)noson-2.12.24\build_vc\noson\$(Configuration);$(SolutionDir)taglib\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PreLinkEvent>
+      <Command>powershell.exe -ExecutionPolicy Bypass -Command "&amp; '$(ProjectDir)UpdateVer.ps1' -Configuration '$(ConfigurationName)'"</Command>
+    </PreLinkEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -147,6 +154,13 @@
 ;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies);windowsapp.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)noson-2.12.24\build_vc\noson\$(Configuration);D:\taglib\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PreLinkEvent>
+      <Command>powershell.exe -ExecutionPolicy Bypass -Command "&amp; '$(ProjectDir)UpdateVer.ps1' -Configuration '$(ConfigurationName)'"</Command>
+    </PreLinkEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\imgui\backends\imgui_impl_dx11.cpp" />

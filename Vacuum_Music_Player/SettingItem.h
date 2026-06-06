@@ -10,10 +10,61 @@
 #include "manageconfig.h"
 #include <texture_utils.h>
 #include <resource.h>
+
 // forward declare PickFolderDialog (avoid including .cpp). Do not repeat default parameter here.
 std::string PickFolderDialog(HWND hwndOwner);
 #include <typeinfo>
 #include <shellapi.h>  // 在文件开头添加
+#pragma comment(lib, "Version.lib")
+
+
+inline std::string WCharToString(const wchar_t* wstr, UINT codePage = CP_UTF8) {
+    if (!wstr || !*wstr) return std::string();
+
+    int len = WideCharToMultiByte(codePage, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+    if (len == 0) return std::string();
+
+    std::string result(len - 1, '\0'); // -1 排除结尾的 L'\0'
+    WideCharToMultiByte(codePage, 0, wstr, -1, &result[0], len, nullptr, nullptr);
+    return result;
+}
+
+inline std::string GetFileVersionString()
+{
+    TCHAR szFullPath[MAX_PATH] = { 0 };
+    GetModuleFileName(NULL, szFullPath, MAX_PATH);  // 获取当前程序路径
+
+    DWORD dwHandle = 0;
+    DWORD dwSize = GetFileVersionInfoSize(szFullPath, &dwHandle);
+    if (dwSize == 0) return "未知";
+
+    BYTE* pBuffer = new BYTE[dwSize];
+    if (!GetFileVersionInfo(szFullPath, dwHandle, dwSize, pBuffer)) {
+        delete[] pBuffer;
+        return "未知";
+    }
+
+    VS_FIXEDFILEINFO* pFileInfo = nullptr;
+    UINT uLen = 0;
+    if (!VerQueryValue(pBuffer, L"\\", (LPVOID*)&pFileInfo, &uLen)) {
+        delete[] pBuffer;
+        return "未知";
+    }
+
+    // 提取版本号各部分
+    int major = HIWORD(pFileInfo->dwFileVersionMS);
+    int minor = LOWORD(pFileInfo->dwFileVersionMS);
+    int build = HIWORD(pFileInfo->dwFileVersionLS);
+    int revision = LOWORD(pFileInfo->dwFileVersionLS);
+
+    delete[] pBuffer;
+
+    wchar_t version[64];
+    if (revision != 0) { swprintf(version, 64, L"%d.%d.%d.%d", major, minor, build, revision);  }
+    else{ swprintf(version, 64, L"%d.%d.%d", major, minor, build); }
+    
+    return WCharToString(version);
+}
 
 // 基础设置项
 struct SettingItemBase {
@@ -310,9 +361,10 @@ struct SettingItemAbout : SettingItemBase {
                 ImGui::Image((ImTextureID)iconSRV, ImVec2(64, 64));
             }
         }
-
+        std::string version = GetFileVersionString();
+        std::string realVersionDisplay = "版本" + version;
         ImGui::Text("Vacuum Music Player 3");
-        ImGui::Text("版本: 3.26.5");          // 你可以从资源或宏读取版本号
+        ImGui::Text(realVersionDisplay.c_str());          // 你可以从资源或宏读取版本号
         ImGui::Text("作者: lazymonkey666");
         ImGui::Separator();
 
