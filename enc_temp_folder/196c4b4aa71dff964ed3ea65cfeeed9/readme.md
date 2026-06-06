@@ -3,7 +3,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://mit-license.org/)
 
-**Vacuum Music Player** 是一个**轻量级、高性能**的本地音乐播放器，采用 Visual C++ 构建，图形由ImGui库搭建，基于 miniaudio 音频引擎。支持常见音频格式，内置歌词显示、专辑封面、系统媒体控件（SMTC）以及与 AMLL 服务的 WebSocket 同步。支持远程投射到SONOS音响。支持亚克力效果。
+**Vacuum Music Player** 是一个轻量级、高性能的本地音乐播放器，采用 C++ 和 ImGui 构建，基于 miniaudio 音频引擎。支持常见音频格式，内置歌词显示、专辑封面、系统媒体控件（SMTC）以及与 AMLL 服务的 WebSocket 同步。支持SONOS音响。
 
 ---
 
@@ -40,25 +40,10 @@
 
 Windows SDK（WIC、D3D11）由 Visual Studio 提供。
 
-Apple Music Like Lyrics（AMLL）服务端（可接受本程序提供的连接AMLL播放器，放在副屏或者其他设备上提供更好的歌词显示功能）：[amll-dev/amll-player: Repo for standalone AMLL Player](https://github.com/amll-dev/amll-player)
+Apple Music Like Lyrics（AMLL）服务端：
 
 ---
-## 运行说明
-本程序有丰富的功能，为了~~防止你把本程序搞丢~~让你更好的使用程序，这里提供一些快捷键参考：
 
-`ctrl+alt+l`用于显示或者隐藏窗口
-
-`ctrl+alt+>`下一首
-
-`ctrl+alt+<`上一首
-
-`ctrl+alt+/`暂停音乐
-
-`ctrl+alt+x`**退出程序**
-
-目前暂不支持修改快捷键
-
----
 ## 🛠️ 构建指南
 
 ### 环境要求（编辑项目）
@@ -68,7 +53,6 @@ Apple Music Like Lyrics（AMLL）服务端（可接受本程序提供的连接AM
 - Git（用于克隆仓库）
 
 ### 仅运行需求
-若想获得更好的兼容性，可以使用我之前的版本（Windows 7 x64以上，Linux支持（Maybe），Python语言）->[lazymonkey666/Vacuum-Music-Controller-2: A simple music controller for Windows 10/11.](https://github.com/lazymonkey666/Vacuum-Music-Controller-2)
 - **Windows 10 / 11**（64 位）
 - 程序将会占用20MB（左右）的运行内存
 - 程序会占用10MB的硬盘空间
@@ -88,6 +72,3 @@ Apple Music Like Lyrics（AMLL）服务端（可接受本程序提供的连接AM
    git clone https://github.com/lazymonkey666/Vacuum-Music-Player-3.git
    ```
 2. **打开解决方案** `Vacuum_Music_Player.sln`
-
-
-## 说明：本程序是人和AI一起完成的，但是因为时间优先，不能很好的维护仓库，代码上有不妥请见谅。

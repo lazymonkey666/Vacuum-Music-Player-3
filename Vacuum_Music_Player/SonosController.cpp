@@ -373,7 +373,12 @@ struct SonosController::Impl {
         auto player = GetPlayer();
         if (!player) return false;
         player->RemoveAllTracksFromQueue();
-        std::string encoded = URLEncode(filename);
+        // encode but preserve '/' so subpaths remain as directories in URL
+        std::string encoded;
+        for (char c : filename) {
+            if (c == '/') { encoded.push_back('/'); }
+            else encoded += URLEncode(std::string(1, c));
+        }
         std::string url = "http://" + localIP + ":" + std::to_string(serverPort) + "/" + encoded;
         DigitalItemPtr item(new DigitalItem(DigitalItem::Type_item, DigitalItem::SubType_audioItem));
         item->SetProperty("dc:title", filename);

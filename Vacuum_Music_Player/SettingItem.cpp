@@ -11,6 +11,7 @@ static int g_theme = 0;
 static bool g_minimizeToTray = false;
 // 持久化的音乐文件夹路径，避免从临时返回值构造unique_ptr时模板推导失败
 static std::string g_musicFolder;
+static bool g_recursive_scan = false;
 static int g_acrylic_opacity=128;
 static std::string g_amllAddress = "ws://localhost:11144/";
 static std::string g_themeStyle = "System";
@@ -22,11 +23,13 @@ SettingWindow::SettingWindow()
     ManageConfig::GetInstance().Load();
 
     g_musicFolder = ManageConfig::GetInstance().GetValue<std::string>("music_folder", "");
+    g_recursive_scan = ManageConfig::GetInstance().GetValue<bool>("recursive_scan", false);
     g_acrylic_opacity = ManageConfig::GetInstance().GetValue<int>("acrylic_opacity", g_acrylic_opacity);
     g_amllAddress = ManageConfig::GetInstance().GetValue<std::string>("amll_address", g_amllAddress);
 
     SettingCategory general("通用");
     general.items.push_back(std::make_unique<SettingItem<std::string>>(g_musicFolder, "music_folder", "音乐文件夹"));
+    general.items.push_back(std::make_unique<SettingItem<bool>>(g_recursive_scan, "recursive_scan", "递归查找文件夹内的所有歌曲"));
     categories_.push_back(std::move(general));
 
     // 歌词分类
