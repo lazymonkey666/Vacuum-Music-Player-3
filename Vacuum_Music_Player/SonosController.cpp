@@ -137,6 +137,7 @@ namespace {
         std::string location;
         std::string server;
         std::string ip;
+        std::string friendlyName;
     };
 
     std::vector<SonosDevice> DiscoverSonosDevices(const std::string& localIP, int timeoutSec) {
@@ -212,6 +213,84 @@ namespace {
                     char ipStr[INET_ADDRSTRLEN];
                     inet_ntop(AF_INET, &from.sin_addr, ipStr, sizeof(ipStr));
                     dev.ip = ipStr;
+                    std::string host, path;
+                    size_t proto_pos = location.find("://");
+                    if (proto_pos != std::string::npos) {
+                        size_t host_start = proto_pos + 3;
+                        size_t host_end = location.find('/', host_start);
+                        if (host_end == std::string::npos) host_end = location.size();
+                        host = location.substr(host_start, host_end - host_start);
+                        if (host_end < location.size())
+                            path = location.substr(host_end);
+                        else
+                            path = "/";
+                    }
+
+                    // 分割 host 和 port
+                    std::string hostname = host;
+                    int port = 80;
+                    size_t colon = host.find(':');
+                    if (colon != std::string::npos) {
+                        hostname = host.substr(0, colon);
+                        port = std::stoi(host.substr(colon + 1));
+                    }
+
+                    // 使用 httplib 发起 GET 请求
+                    httplib::Client cli(hostname, port);
+                    cli.set_connection_timeout(2);   // 2 秒连接超时
+                    cli.set_read_timeout(2);          // 2 秒读取超时
+                    auto res = cli.Get(path.c_str());
+                    if (res && res->status == 200) {
+                        const std::string& body = res->body;
+                        // 提取 MediaRenderer 设备的 friendlyName 中的房间名部分
+                        std::string roomName;
+                        const std::string mediaRendererType = "<deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>";
+                        size_t typePos = body.find(mediaRendererType);
+                        if (typePos != std::string::npos) {
+                            size_t deviceStart = body.rfind("<device", typePos);
+                            if (deviceStart != std::string::npos) {
+                                size_t friendlyStart = body.find("<friendlyName>", deviceStart);
+                                if (friendlyStart != std::string::npos) {
+                                    friendlyStart += 13;
+                                    size_t friendlyEnd = body.find("</friendlyName>", friendlyStart);
+                                    if (friendlyEnd != std::string::npos) {
+                                        std::string fullName = body.substr(friendlyStart+1, friendlyEnd - friendlyStart);
+                                        // 提取第一个 " - " 之前的部分作为房间名
+                                        size_t dash = fullName.find(" - ");
+                                        if (dash != std::string::npos)
+                                            roomName = fullName.substr(0, dash);
+                                        else
+                                            roomName = fullName; // 没有分隔符则用完整名称
+                                    }
+                                }
+                            }
+                        }
+                        if (roomName.empty()) {
+                            // 后备：根设备的 friendlyName
+                            const std::string tagOpen = "<friendlyName>";
+                            const std::string tagClose = "</friendlyName>";
+                            size_t start = body.find(tagOpen);
+                            if (start != std::string::npos) {
+                                start += tagOpen.size();
+                                size_t end = body.find(tagClose, start);
+                                if (end != std::string::npos) {
+                                    std::string rootName = body.substr(start, end - start);
+                                    size_t dash = rootName.find(" - ");
+                                    if (dash != std::string::npos)
+                                        roomName = rootName.substr(0, dash);
+                                    else
+                                        roomName = rootName;
+                                }
+                            }
+                        }
+                        if (!roomName.empty())
+                            dev.friendlyName = roomName + " - " + dev.ip;   // 显示为 "客厅 - 192.168.3.51"
+                        else
+                            dev.friendlyName = dev.ip;
+                    }
+                    else {
+                        dev.friendlyName = dev.ip;
+                    }
                     devices.push_back(dev);
                 }
             }
@@ -480,7 +559,12 @@ std::vector<DeviceEntry> SonosController::SearchDevices(int totalTimeoutSec) {
 
     std::vector<DeviceEntry> entries;
     for (size_t i = 0; i < state->devices.size(); ++i) {
-        entries.push_back({ (int)i, state->devices[i].ip, state->devices[i].location });
+        entries.push_back({
+            (int)i,
+            state->devices[i].ip,
+            state->devices[i].location,
+            state->devices[i].friendlyName   // 填入设备名称
+            });
     }
     return entries;
 }

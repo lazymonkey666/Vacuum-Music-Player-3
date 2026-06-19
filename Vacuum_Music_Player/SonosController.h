@@ -20,6 +20,7 @@ struct DeviceEntry {
     int index;              // 编号
     std::string name;       // 显示名称（IP 或设备名）
     std::string location;   // 连接用的 URL
+    std::string friendlyName;//友好名称
 };
 
 

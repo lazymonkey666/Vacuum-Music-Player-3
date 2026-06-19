@@ -15,6 +15,7 @@ static bool g_recursive_scan = false;
 static int g_acrylic_opacity=128;
 static std::string g_amllAddress = "ws://localhost:11144/";
 static std::string g_themeStyle = "System";
+static bool g_enableSnapToEdge = true;
 
 SettingWindow::SettingWindow()
     : cfg(ManageConfig::GetInstance())
@@ -22,10 +23,11 @@ SettingWindow::SettingWindow()
     // Ensure config loaded
     ManageConfig::GetInstance().Load();
 
-    g_musicFolder = ManageConfig::GetInstance().GetValue<std::string>("music_folder", "");
-    g_recursive_scan = ManageConfig::GetInstance().GetValue<bool>("recursive_scan", false);
-    g_acrylic_opacity = ManageConfig::GetInstance().GetValue<int>("acrylic_opacity", g_acrylic_opacity);
-    g_amllAddress = ManageConfig::GetInstance().GetValue<std::string>("amll_address", g_amllAddress);
+    //g_musicFolder = ManageConfig::GetInstance().GetValue<std::string>("music_folder", "");
+    //g_recursive_scan = ManageConfig::GetInstance().GetValue<bool>("recursive_scan", false);
+    //g_acrylic_opacity = ManageConfig::GetInstance().GetValue<int>("acrylic_opacity", g_acrylic_opacity);
+    //g_amllAddress = ManageConfig::GetInstance().GetValue<std::string>("amll_address", g_amllAddress);
+    //g_enableSnapToEdge = ManageConfig::GetInstance().GetValue("enable_snap_to_edge", g_enableSnapToEdge);
 
     SettingCategory general("通用");
     general.items.push_back(std::make_unique<SettingItem<std::string>>(g_musicFolder, "music_folder", "音乐文件夹"));
@@ -48,19 +50,31 @@ SettingWindow::SettingWindow()
         {"跟随系统", "System"}
     };
 
-    // 或者使用单选按钮版本
+    // 使用单选按钮版本
+    appearance.items.push_back(std::make_unique<SettingItem<bool>>(
+        g_enableSnapToEdge,
+        "enable_snap_to_edge",
+        "启用窗口贴边停靠"
+    ));
     appearance.items.push_back(std::make_unique<SettingItemRadio>(
         g_themeStyle,
         "theme_style",
         "主题风格",
         themeOptions
     ));
+
+    //窗口是否贴边
+    
     categories_.push_back(std::move(appearance));
 
     // 关于分类
     SettingCategory about("关于");
     about.items.push_back(std::make_unique<SettingItemAbout>("about", "关于"));
     categories_.push_back(std::move(about));
+
+    for (auto& catAll : categories_) {
+        for (auto& item : catAll.items) item->load();
+    }
 }
 
 void SettingWindow::render() {

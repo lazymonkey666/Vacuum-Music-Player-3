@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -210,6 +210,7 @@
     <ClCompile Include="..\ixwebsocket\IXWebSocketTransport.cpp" />
     <ClCompile Include="albumimgtagreader.cpp" />
     <ClCompile Include="AMLLWebSocket.cpp" />
+    <ClCompile Include="IconManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manageconfig.cpp" />
     <ClCompile Include="SettingItem.cpp" />
@@ -279,8 +280,11 @@
     <ClInclude Include="..\ixwebsocket\IXWebSocketTransport.h" />
     <ClInclude Include="..\ixwebsocket\IXWebSocketVersion.h" />
     <ClInclude Include="..\miniaudio.h" />
+    <ClInclude Include="..\nanosvg.h" />
+    <ClInclude Include="..\nanosvgrast.h" />
     <ClInclude Include="albumimgtagreader.h" />
     <ClInclude Include="AMLLWebSocket.h" />
+    <ClInclude Include="IconManager.h" />
     <ClInclude Include="manageconfig.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="SettingItem.h" />

@@ -171,6 +171,9 @@
     <ClCompile Include="texture_utils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="IconManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\imgui\imconfig.h">
@@ -378,6 +381,15 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="texture_utils.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="IconManager.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanosvg.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanosvgrast.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>
