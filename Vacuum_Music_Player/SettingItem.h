@@ -201,7 +201,7 @@ struct SettingItemText : SettingItemBase {
         std::string tmp = label;
         if (ImGui::InputText(("##" + tmp).c_str(), buf, sizeof(buf))) {
             value = buf;
-            save();
+            
         }
         ImGui::Separator();
     }

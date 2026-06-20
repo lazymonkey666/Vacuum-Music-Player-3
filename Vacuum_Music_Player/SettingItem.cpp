@@ -16,6 +16,9 @@ static int g_acrylic_opacity=128;
 static std::string g_amllAddress = "ws://localhost:11144/";
 static std::string g_themeStyle = "System";
 static bool g_enableSnapToEdge = true;
+static std::string g_playmode = "local";
+static std::string g_neteaseapiaddress = "";
+static std::string g_neteaseplaylistid = "";
 
 SettingWindow::SettingWindow()
     : cfg(ManageConfig::GetInstance())
@@ -28,10 +31,24 @@ SettingWindow::SettingWindow()
     //g_acrylic_opacity = ManageConfig::GetInstance().GetValue<int>("acrylic_opacity", g_acrylic_opacity);
     //g_amllAddress = ManageConfig::GetInstance().GetValue<std::string>("amll_address", g_amllAddress);
     //g_enableSnapToEdge = ManageConfig::GetInstance().GetValue("enable_snap_to_edge", g_enableSnapToEdge);
+    std::vector<std::pair<std::string, std::string>> PlayModeOptions = {
+        {"本地播放", "local"},
+        {"在线（需在下方配置网易云音乐API）", "online"},
+    };
+
 
     SettingCategory general("通用");
     general.items.push_back(std::make_unique<SettingItem<std::string>>(g_musicFolder, "music_folder", "音乐文件夹"));
     general.items.push_back(std::make_unique<SettingItem<bool>>(g_recursive_scan, "recursive_scan", "递归查找文件夹内的所有歌曲"));
+    general.items.push_back(std::make_unique<SettingItemRadio>(
+        g_playmode,
+        "play_mode",
+        "播放来源",
+        PlayModeOptions
+    ));
+    general.items.push_back(std::make_unique<SettingItemText>(g_neteaseapiaddress, "netease_api_address", "网易云API地址（BaseURL）\n例子：http://localhost:3000/\n注意：http协议和地址末尾要有斜杠“/”，否则程序可能不能正常运行"));
+    general.items.push_back(std::make_unique<SettingItemText>(g_neteaseplaylistid, "netease_playlist_id", "网易云歌单ID\n例子：https://music.163.com/playlist?id=xxxxxxx&uct2=[某些字母]=\n其中的xxxxxxx部分填入选项"));
+
     categories_.push_back(std::move(general));
 
     // 歌词分类
