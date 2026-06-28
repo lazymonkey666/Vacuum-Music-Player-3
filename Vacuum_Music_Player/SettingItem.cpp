@@ -3,6 +3,9 @@
 #include <string>
 #include <windows.h>
 
+extern HANDLE g_hMutex;
+
+
 // 全局配置变量（实际应放在配置管理类中）
 static bool g_autoPlay = true;
 static int g_volume = 70;
@@ -19,6 +22,8 @@ static bool g_enableSnapToEdge = true;
 static std::string g_playmode = "local";
 static std::string g_neteaseapiaddress = "";
 static std::string g_neteaseplaylistid = "";
+static bool g_skipvip = false;
+
 
 SettingWindow::SettingWindow()
     : cfg(ManageConfig::GetInstance())
@@ -48,7 +53,7 @@ SettingWindow::SettingWindow()
     ));
     general.items.push_back(std::make_unique<SettingItemText>(g_neteaseapiaddress, "netease_api_address", "网易云API地址（BaseURL）\n例子：http://localhost:3000/\n注意：http协议和地址末尾要有斜杠“/”，否则程序可能不能正常运行"));
     general.items.push_back(std::make_unique<SettingItemText>(g_neteaseplaylistid, "netease_playlist_id", "网易云歌单ID\n例子：https://music.163.com/playlist?id=xxxxxxx&uct2=[某些字母]=\n其中的xxxxxxx部分填入选项"));
-
+    general.items.push_back(std::make_unique<SettingItem<bool>>(g_skipvip, "skip_vip", "跳过需要的VIP音乐"));
     categories_.push_back(std::move(general));
 
     // 歌词分类
@@ -139,25 +144,29 @@ void SettingWindow::render() {
     );
     ImGui::SetCursorScreenPos(saveBtnPos);
     if (ImGui::Button("保存设置", ImVec2(buttonWidth, buttonHeight))) {
+        // 保存所有设置项
         for (auto& catAll : categories_) {
             for (auto& item : catAll.items) item->save();
         }
-        // 保存并软重启程序以应用设置
-        // Soft restart: save config, spawn new process with same command line, then exit
-        auto SoftRestart = []() {
-            ManageConfig::GetInstance().Save();
-            LPWSTR cmdLine = GetCommandLineW();
-            std::wstring cmd(cmdLine);
-            STARTUPINFOW si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
-            PROCESS_INFORMATION pi; ZeroMemory(&pi, sizeof(pi));
-            if (CreateProcessW(NULL, &cmd[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-                CloseHandle(pi.hThread);
-                CloseHandle(pi.hProcess);
-                ExitProcess(0);
-            }
-        };
-        SoftRestart();
+        ManageConfig::GetInstance().Save();
 
+        // 关闭互斥体，释放锁（让新进程可以创建自己的互斥体）
+        if (g_hMutex) {
+            CloseHandle(g_hMutex);
+            g_hMutex = NULL;
+        }
+
+        // 启动新进程（使用当前命令行）
+        LPWSTR cmdLine = GetCommandLineW();
+        std::wstring cmd(cmdLine);
+        STARTUPINFOW si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
+        PROCESS_INFORMATION pi; ZeroMemory(&pi, sizeof(pi));
+        if (CreateProcessW(NULL, &cmd[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        }
+        // 无论启动是否成功，当前进程退出
+        ExitProcess(0);
     }
 
 

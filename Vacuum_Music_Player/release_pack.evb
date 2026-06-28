@@ -51,6 +51,148 @@
             <PassCommandLine>False</PassCommandLine>
             <HideFromDialogs>0</HideFromDialogs>
           </File>
+          <File>
+            <Type>3</Type>
+            <Name>resources</Name>
+            <Action>0</Action>
+            <OverwriteDateTime>False</OverwriteDateTime>
+            <OverwriteAttributes>False</OverwriteAttributes>
+            <HideFromDialogs>0</HideFromDialogs>
+            <Files>
+              <File>
+                <Type>2</Type>
+                <Name>hide.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\hide.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>locate.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\locate.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>more.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\more.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>next.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\next.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>order.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\order.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>pause.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\pause.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>play.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\play.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>prev.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\prev.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>random.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\random.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>round.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\round.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+              <File>
+                <Type>2</Type>
+                <Name>search.svg</Name>
+                <File>D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\x64\Release\resources\search.svg</File>
+                <ActiveX>False</ActiveX>
+                <ActiveXInstall>False</ActiveXInstall>
+                <Action>0</Action>
+                <OverwriteDateTime>False</OverwriteDateTime>
+                <OverwriteAttributes>False</OverwriteAttributes>
+                <PassCommandLine>False</PassCommandLine>
+                <HideFromDialogs>0</HideFromDialogs>
+              </File>
+            </Files>
+          </File>
         </Files>
       </File>
     </Files>

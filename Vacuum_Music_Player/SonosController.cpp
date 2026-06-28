@@ -313,12 +313,26 @@ struct SonosController::Impl {
     httplib::Server* httpServer = nullptr;
     bool httpRunning = false;
 
+    std::chrono::steady_clock::time_point m_playStartTime;
+    int m_cachedPositionMs = 0;          // 最后一次校准的进度（毫秒）
+    bool m_isPlaying = false;
+    std::mutex m_timeMutex;
+    std::atomic<bool> m_stopPolling{ false };
+    std::thread m_pollThread;
+
+    // 方法声明
+    void StartPolling();
+    void StopPolling();
+    void PollLoop();
+    int GetPosition();  // 供 UI 调用
+
     ~Impl() {
         Stop();
     }
 
     void Stop() {
         StopHttpServer();
+        StopPolling();
         sonosSystem.reset();
         connected = false;
         if (initialized) {
@@ -466,7 +480,14 @@ struct SonosController::Impl {
         OutputDebugStringA((url + "\n").c_str());
         if (player->SetCurrentURI(item))
         {
-            return player->Play();
+            if (player->Play()) {
+                std::lock_guard<std::mutex> lock(m_timeMutex);
+                m_playStartTime = std::chrono::steady_clock::now();
+                m_cachedPositionMs = 0;
+                m_isPlaying = true;
+                return true;
+            }
+            return false;
         }
     }
     int ParseRelTimeToMs(const std::string& relTime) {
@@ -481,25 +502,20 @@ struct SonosController::Impl {
         auto player = GetPlayer();
         if (player) {
             player->SeekTime(pos / 1000);
-        }
-    }
-    int GetPosition() {
-        auto player = GetPlayer();
-
-        SONOS::ElementList vars;
-        if (player->GetPositionInfo(vars)) {
-            // 查找 RelTime 键
-            const std::string& relTimeStr = vars.GetValue("RelTime");
-            if (!relTimeStr.empty()) {
-                int ms = ParseRelTimeToMs(relTimeStr);
-                if (ms > 0) {
-                    return ms;
-                }
+            // 校准：请求实际进度并重置本地计时器
+            SONOS::ElementList vars;
+            if (player->GetPositionInfo(vars)) {
+                std::string relTime = vars.GetValue("RelTime");
+                int realPos = ParseRelTimeToMs(relTime);
+                std::lock_guard<std::mutex> lock(m_timeMutex);
+                m_cachedPositionMs = realPos;
+                m_playStartTime = std::chrono::steady_clock::now();
+                m_isPlaying = true;  // 假设拖动后自动播放
             }
         }
     }
     int GetSonosTrackDuration() {
-        auto player =GetPlayer();
+        auto player = GetPlayer();
         if (!player) return 0;
 
         SONOS::ElementList vars;
@@ -511,7 +527,10 @@ struct SonosController::Impl {
         }
         return 0;
     }
+    
 };
+
+
 
 // ================= SonosController 公开接口 =================
 SonosController::SonosController() : pImpl(std::make_unique<Impl>()) {}
@@ -581,6 +600,7 @@ bool SonosController::ConnectToDevice(const std::string& location) {
         return false;
     }
     pImpl->connected = true;
+    pImpl->StartPolling();
     return true;
 }
 
@@ -622,4 +642,59 @@ void SonosController::SetPlayPos(int pos) {
 }
 void SonosController::Stop() {
     pImpl->Stop();
+}
+
+int SonosController::Impl::GetPosition() {
+    std::lock_guard<std::mutex> lock(m_timeMutex);
+    if (!m_isPlaying) return m_cachedPositionMs;
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_playStartTime).count();
+    return m_cachedPositionMs + static_cast<int>(elapsed);
+}
+
+void SonosController::Impl::StartPolling() {
+    m_stopPolling = false;
+    m_pollThread = std::thread(&Impl::PollLoop, this);
+}
+
+void SonosController::Impl::StopPolling() {
+    m_stopPolling = true;
+    if (m_pollThread.joinable()) m_pollThread.join();
+}
+
+void SonosController::Impl::PollLoop() {
+    int calibrateCounter = 0;
+    while (!m_stopPolling) {
+        auto player = GetPlayer();
+        if (player) {
+            // 更新播放状态（轻量）
+            SONOS::ElementList vars;
+            if (player->GetTransportInfo(vars)) {
+                bool playing = (vars.GetValue("CurrentTransportState") == "PLAYING");
+                std::lock_guard<std::mutex> lock(m_timeMutex);
+                if (playing != m_isPlaying) {
+                    m_isPlaying = playing;
+                    if (playing) {
+                        m_playStartTime = std::chrono::steady_clock::now();
+                        m_cachedPositionMs = 0;
+                    }
+                }
+            }
+
+            // 每 10 秒校准一次进度
+            calibrateCounter++;
+            if (calibrateCounter >= 10) {
+                calibrateCounter = 0;
+                SONOS::ElementList posVars;
+                if (player->GetPositionInfo(posVars)) {
+                    std::string relTime = posVars.GetValue("RelTime");
+                    int realPos = ParseRelTimeToMs(relTime);
+                    std::lock_guard<std::mutex> lock(m_timeMutex);
+                    m_cachedPositionMs = realPos;
+                    m_playStartTime = std::chrono::steady_clock::now();
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }

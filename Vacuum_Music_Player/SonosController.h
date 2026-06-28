@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <mutex>
 
 // 前置声明（不暴露 noson 细节给外部）
 #include <sonosplayer.h>   // 需要这个来获得准确的 PlayerPtr 类型
@@ -69,5 +70,10 @@ public:
 private:
     // 内部实现细节隐藏
     struct Impl;
+    std::chrono::steady_clock::time_point m_playStartTime;
+    int m_cachedPositionMs = 0;        // 最后一次从设备获取的进度
+    bool m_isPlaying = false;
+    std::atomic<int> m_displayPositionMs{ 0 };  // 用于 UI 显示的进度（本地推算）
+    std::mutex m_timeMutex;
     std::unique_ptr<Impl> pImpl;
 };
