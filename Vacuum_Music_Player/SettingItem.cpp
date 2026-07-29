@@ -23,6 +23,8 @@ static std::string g_playmode = "local";
 static std::string g_neteaseapiaddress = "";
 static std::string g_neteaseplaylistid = "";
 static bool g_skipvip = false;
+static bool g_enable_cache_limit = true;
+static int g_cache_limit_mb = 2048;
 
 
 SettingWindow::SettingWindow()
@@ -54,6 +56,8 @@ SettingWindow::SettingWindow()
     general.items.push_back(std::make_unique<SettingItemText>(g_neteaseapiaddress, "netease_api_address", "网易云API地址（BaseURL）\n例子：http://localhost:3000/\n注意：http协议和地址末尾要有斜杠“/”，否则程序可能不能正常运行"));
     general.items.push_back(std::make_unique<SettingItemText>(g_neteaseplaylistid, "netease_playlist_id", "网易云歌单ID\n例子：https://music.163.com/playlist?id=xxxxxxx&uct2=[某些字母]=\n其中的xxxxxxx部分填入选项"));
     general.items.push_back(std::make_unique<SettingItem<bool>>(g_skipvip, "skip_vip", "跳过需要的VIP音乐"));
+    general.items.push_back(std::make_unique<SettingItem<bool>>(g_enable_cache_limit, "enable_cache_limit", "开启缓存限制"));
+    general.items.push_back(std::make_unique<SettingItem<int>>(g_cache_limit_mb, "cache_limit_mb", "缓存大小限制(MB)", 512, 8192));
     categories_.push_back(std::move(general));
 
     // 歌词分类

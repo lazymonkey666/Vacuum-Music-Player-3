@@ -17,6 +17,7 @@ struct NeteaseSongInfo {
     std::string playUrl;   // 播放链接（可能为空）
     std::string trialUrl;  // 试听链接（30秒）
     std::string albumArtUrl;
+    std::string fileType; //音频扩展名
 };
 
 class NeteaseAPIManager {

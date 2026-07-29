@@ -194,6 +194,7 @@ std::string NeteaseAPIManager::GetSongUrl(const std::string& songId, const std::
             if (first.contains("url") && !first["url"].is_null() && first["url"].is_string())
                 return first["url"].get<std::string>();
         }
+        
         return "";
     }
     //else {

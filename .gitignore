@@ -25,6 +25,9 @@ config.json
 .vscode/
 .vscode/*
 
+imgui.ini
+enc_temp_folder/
+enc_temp_folder/*
 
 
 # 忽略 CMake 的用户缓存目录（如果使用了 CMake）
