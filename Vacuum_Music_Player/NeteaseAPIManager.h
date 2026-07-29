@@ -36,7 +36,7 @@ public:
     std::vector<NeteaseSongInfo> GetSongsDetail(const std::vector<std::string>& ids);
 
     // 获取单首歌曲播放 URL（可指定音质：standard, higher, exhigh, lossless, hires）
-    std::string GetSongUrl(const std::string& songId, const std::string& level = "exhigh");
+    std::string GetSongUrl(const std::string& songId, const std::string& level = "exhigh",const std::string cookie="");
 
     // 获取歌曲完整信息（包括 URL 和 fee）
     NeteaseSongInfo GetSongFullInfo(const std::string& songId, const std::string& level = "exhigh");
@@ -49,6 +49,21 @@ public:
 
     std::string GetLyrics(const std::string& songId);
 
+    bool UpdateCookie(const std::string& cookie);
+    void SetUserCookie(const std::string& cookie);   // 设置用户 Cookie（覆盖游客模式）
+    void ClearUserCookie();                          // 清除用户 Cookie，回退到游客（如果有）
+    bool HasUserCookie() const { return !m_userCookie.empty(); }
+    std::string GetCurrentCookie() const;
+    bool SendCaptcha(const std::string& phone);
+
+    // 验证码登录
+    bool LoginByCaptcha(const std::string& phone, const std::string& captcha);
+
+    // 获取当前登录状态
+    bool IsLoggedIn() const { return !m_userCookie.empty(); }
+
+    
+
 private:
     NeteaseAPIManager() = default;
     ~NeteaseAPIManager() = default;
@@ -58,6 +73,7 @@ private:
         const std::vector<std::pair<std::string, std::string>>& params = {},
         const httplib::Headers& extraHeaders = {});
 
+    std::string m_userCookie;
     std::string m_baseUrl;
     std::string m_guestCookie;
     bool m_enableGuest = true;
@@ -66,4 +82,11 @@ private:
     // 内部辅助
     std::string SafeGetString(const nlohmann::json& obj, const std::string& key, const std::string& defaultVal = "");
     std::vector<std::string> ExtractTrackIds(const nlohmann::json& trackIdsJson);
+    mutable std::mutex m_mutex;   // 保护内部 Cookie 状态
+
 };
+
+bool EncryptStringWithDPAPI(const std::string& plaintext, std::string& ciphertext);
+bool DecryptStringWithDPAPI(const std::string& ciphertext, std::string& plaintext);
+std::string Base64Encode(const std::string& binary);
+std::string Base64Decode(const std::string& base64);

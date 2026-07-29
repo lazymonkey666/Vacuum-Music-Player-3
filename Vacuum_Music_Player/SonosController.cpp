@@ -11,7 +11,7 @@
 #include <iomanip>
 #include <thread>
 #include <unordered_set>
-
+#include <windows.h>
 // noson 库头文件
 #include <sonossystem.h>
 #include <sonosplayer.h>
@@ -21,6 +21,12 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
+extern HWND g_hWnd;
+
+
+#ifndef WM_SONOS_STOPPED
+#define WM_SONOS_STOPPED (WM_APP + 300)
+#endif
 // ================= 工具函数 =================
 namespace {
     std::string PathToUTF8(const std::string& localPath) {
@@ -319,6 +325,7 @@ struct SonosController::Impl {
     std::mutex m_timeMutex;
     std::atomic<bool> m_stopPolling{ false };
     std::thread m_pollThread;
+    std::string m_transportState;
 
     // 方法声明
     void StartPolling();
@@ -590,6 +597,8 @@ std::vector<DeviceEntry> SonosController::SearchDevices(int totalTimeoutSec) {
 
 bool SonosController::ConnectToDevice(const std::string& location) {
     if (!pImpl->initialized) return false;
+    pImpl->StopPolling();
+    pImpl->sonosSystem.reset();
 	OutputDebugStringA(("Connecting to: " + location + "\n").c_str());
     pImpl->sonosSystem = std::make_unique<SONOS::System>(
         static_cast<void*>(0),
@@ -667,23 +676,30 @@ void SonosController::Impl::PollLoop() {
     while (!m_stopPolling) {
         auto player = GetPlayer();
         if (player) {
-            // 更新播放状态（轻量）
             SONOS::ElementList vars;
             if (player->GetTransportInfo(vars)) {
-                bool playing = (vars.GetValue("CurrentTransportState") == "PLAYING");
+                std::string state = vars.GetValue("CurrentTransportState");
+                // 转为小写便于比较
+                std::transform(state.begin(), state.end(), state.begin(), ::tolower);
                 std::lock_guard<std::mutex> lock(m_timeMutex);
-                if (playing != m_isPlaying) {
+                if (m_transportState != state) {
+                    m_transportState = state;
+                    bool playing = (state == "playing");
                     m_isPlaying = playing;
                     if (playing) {
                         m_playStartTime = std::chrono::steady_clock::now();
                         m_cachedPositionMs = 0;
                     }
+                    else if (state == "stopped") {
+                        // 通知主线程切歌（仅当之前不是 stopped，避免重复发送）
+                        ::PostMessage(g_hWnd, WM_SONOS_STOPPED, 0, 0);
+                    }
                 }
             }
 
-            // 每 10 秒校准一次进度
+            // 每 10 秒校准一次进度（放在状态更新之后，不影响主循环）
             calibrateCounter++;
-            if (calibrateCounter >= 10) {
+            if (calibrateCounter >= 5) {
                 calibrateCounter = 0;
                 SONOS::ElementList posVars;
                 if (player->GetPositionInfo(posVars)) {
@@ -695,6 +711,6 @@ void SonosController::Impl::PollLoop() {
                 }
             }
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 }

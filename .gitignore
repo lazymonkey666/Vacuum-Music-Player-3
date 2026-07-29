@@ -14,6 +14,19 @@ Obj/
 # 忽略个人配置文件（关键！）
 config.json
 
+.env
+.env.*
+
+*.old
+*.backup
+*.bak
+*.vs
+
+.vscode/
+.vscode/*
+
+
+
 # 忽略 CMake 的用户缓存目录（如果使用了 CMake）
 CMakeUserPresets.json
 CMakeSettings.json

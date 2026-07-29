@@ -362,13 +362,19 @@ struct SettingItemAbout : SettingItemBase {
             }
         }
         std::string version = GetFileVersionString();
-        std::string realVersionDisplay = "版本" + version;
+        std::string realVersionDisplay = "版本:" + version;
         ImGui::Text("Vacuum Music Player 3");
         ImGui::Text(realVersionDisplay.c_str());          // 你可以从资源或宏读取版本号
         ImGui::Text("作者: lazymonkey666");
+        if (ImGui::Button("本产品遵循MIT许可证")) {
+            ShellExecuteA(NULL, "open", "https://mit-license.org/", NULL, NULL, SW_SHOWNORMAL);
+        }
         ImGui::Separator();
 
         // GitHub 仓库链接（可点击）
+        if (ImGui::Button("仓库链接")) {
+            ShellExecuteA(NULL, "open", "https://github.com/lazymonkey666/Vacuum-Music-Player-3/", NULL, NULL, SW_SHOWNORMAL);
+        }
         if (ImGui::Button("作者链接")) {
             ShellExecuteA(NULL, "open", "https://github.com/lazymonkey666", NULL, NULL, SW_SHOWNORMAL);
         }
