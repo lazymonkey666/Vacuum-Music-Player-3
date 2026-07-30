@@ -25,6 +25,7 @@ static std::string g_neteaseplaylistid = "";
 static bool g_skipvip = false;
 static bool g_enable_cache_limit = true;
 static int g_cache_limit_mb = 2048;
+static bool g_enable_lyric_translate_split = true;
 
 
 SettingWindow::SettingWindow()
@@ -63,6 +64,7 @@ SettingWindow::SettingWindow()
     // 歌词分类
     SettingCategory lyric("歌词");
     lyric.items.push_back(std::make_unique<SettingItemText>(g_amllAddress,"amll_address","AMLL 音乐播放器地址"));
+    lyric.items.push_back(std::make_unique<SettingItem<bool>>(g_enable_lyric_translate_split, "enable_lyric_translate_split", "允许在连接AMLL后自动分割翻译\n如果你平时喜欢听中文歌，可以关闭此选项\n英文歌用户建议保持开启"));
     categories_.push_back(std::move(lyric));
 
     // 外观分类

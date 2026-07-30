@@ -148,7 +148,7 @@ struct SettingItem<bool> : SettingItemBase {
     const char* name;
     const char* label;
     SettingItem(bool& val, const char* key, const char* lbl) : value(val), name(key), label(lbl) {}
-    void render() override { ImGui::Text(label); ImGui::Checkbox(label, &value); ImGui::Separator();}
+    void render() override {  ImGui::Checkbox(label, &value); ImGui::Separator();}
     void save() override { ManageConfig::GetInstance().SetValue(name, value); ManageConfig::GetInstance().Save(); }
     void load() override { value = ManageConfig::GetInstance().GetValue<bool>(name, value); }
 };

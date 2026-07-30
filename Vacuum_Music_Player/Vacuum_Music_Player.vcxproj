@@ -209,7 +209,7 @@
     <ClCompile Include="..\ixwebsocket\IXWebSocketServer.cpp" />
     <ClCompile Include="..\ixwebsocket\IXWebSocketTransport.cpp" />
     <ClCompile Include="albumimgtagreader.cpp" />
-    <ClCompile Include="AMLLWebSocket.cpp" />
+    <ClCompile Include="AMLLWebSocketV2.cpp" />
     <ClCompile Include="IconManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manageconfig.cpp" />
@@ -284,7 +284,7 @@
     <ClInclude Include="..\nanosvg.h" />
     <ClInclude Include="..\nanosvgrast.h" />
     <ClInclude Include="albumimgtagreader.h" />
-    <ClInclude Include="AMLLWebSocket.h" />
+    <ClInclude Include="AMLLWebSocketV2.h" />
     <ClInclude Include="IconManager.h" />
     <ClInclude Include="manageconfig.h" />
     <ClInclude Include="NeteaseAPIManager.h" />

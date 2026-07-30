@@ -159,9 +159,6 @@
     <ClCompile Include="..\ixwebsocket\IXWebSocketTransport.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="AMLLWebSocket.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="SonosController.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -175,6 +172,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="NeteaseAPIManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="AMLLWebSocketV2.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -371,9 +371,6 @@
     <ClInclude Include="..\ixwebsocket\IXWebSocketVersion.h">
       <Filter>源文件</Filter>
     </ClInclude>
-    <ClInclude Include="AMLLWebSocket.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
     <ClInclude Include="SonosController.h">
       <Filter>源文件</Filter>
     </ClInclude>
@@ -396,6 +393,9 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="NeteaseAPIManager.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AMLLWebSocketV2.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -69,8 +69,8 @@ IDB_PNG1                PNG                     "vacuum_music_player_64x64.png"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,26,6,4
- PRODUCTVERSION 3,26,6,4
+ FILEVERSION 3,26,7,2
+ PRODUCTVERSION 3,26,7,2
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -87,12 +87,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "lazymonkey666"
             VALUE "FileDescription", "Vacuum Music Player 3"
-            VALUE "FileVersion", "3.26.6.4"
+            VALUE "FileVersion", "3.26.7.2"
             VALUE "InternalName", "Vacuum_M.exe"
             VALUE "LegalCopyright", "Copyright (C) lazymonkey666 2026"
             VALUE "OriginalFilename", "Vacuum_M.exe"
             VALUE "ProductName", "Vacuum Music Player"
-            VALUE "ProductVersion", "3.26.6.4"
+            VALUE "ProductVersion", "3.26.7.2"
         END
     END
     BLOCK "VarFileInfo"
