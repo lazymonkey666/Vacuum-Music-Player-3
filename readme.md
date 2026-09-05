@@ -1,7 +1,7 @@
 # 🎵 Vacuum Music Player
 ---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://mit-license.org/)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL-V3)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 **Vacuum Music Player** 是一个**轻量级、高性能**的本地音乐播放器，采用 Visual C++ 构建，图形由ImGui库搭建，基于 miniaudio 音频引擎。支持常见音频格式，内置歌词显示、专辑封面、系统媒体控件（SMTC）以及与 AMLL 服务的 WebSocket 同步。支持远程投射到SONOS音响。支持亚克力效果。
 

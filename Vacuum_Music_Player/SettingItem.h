@@ -366,8 +366,8 @@ struct SettingItemAbout : SettingItemBase {
         ImGui::Text("Vacuum Music Player 3");
         ImGui::Text(realVersionDisplay.c_str());          // 你可以从资源或宏读取版本号
         ImGui::Text("作者: lazymonkey666");
-        if (ImGui::Button("本产品遵循MIT许可证")) {
-            ShellExecuteA(NULL, "open", "https://mit-license.org/", NULL, NULL, SW_SHOWNORMAL);
+        if (ImGui::Button("本产品遵循GPL-3.0 or later许可证")) {
+            ShellExecuteA(NULL, "open", "https://www.gnu.org/licenses/gpl-3.0.html", NULL, NULL, SW_SHOWNORMAL);
         }
         ImGui::Separator();
 
