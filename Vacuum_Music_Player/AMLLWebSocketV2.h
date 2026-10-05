@@ -70,8 +70,6 @@ public:
 
     void sendAlbumCover(const std::vector<uint8_t>& imageData);
 
-    void sendLyricFromLRC(const std::string& lrcContent);
-
     void sendResumed();
     void sendPaused();
     void sendProgress(uint64_t posMs);
@@ -89,8 +87,6 @@ public:
     void sendVolume(float vol);
     void sendAudioData(const std::vector<uint8_t>& pcmData);
 
-    // LRC → TTML 转换（静态工具）
-    static std::string convertLRCToTTML(const std::string& lrc);
     void sendInitialData();
     // LRC → Structured 歌词转换（新增）
 
@@ -105,7 +101,6 @@ private:
     ix::WebSocket webSocket_;
     std::atomic<bool> connected_{ false };
     std::atomic<bool> running_{ false };
-    std::unique_ptr<std::thread> progressThread_;
 
     void onMessage(const ix::WebSocketMessagePtr& msg);
     

@@ -63,7 +63,7 @@ public:
     // 获取当前登录状态
     bool IsLoggedIn() const { return !m_userCookie.empty(); }
 
-    
+    std::string GetNeteaseUserName();
 
 private:
     NeteaseAPIManager() = default;
@@ -84,10 +84,12 @@ private:
     std::string SafeGetString(const nlohmann::json& obj, const std::string& key, const std::string& defaultVal = "");
     std::vector<std::string> ExtractTrackIds(const nlohmann::json& trackIdsJson);
     mutable std::mutex m_mutex;   // 保护内部 Cookie 状态
+    
 
 };
 
-bool EncryptStringWithDPAPI(const std::string& plaintext, std::string& ciphertext);
-bool DecryptStringWithDPAPI(const std::string& ciphertext, std::string& plaintext);
-std::string Base64Encode(const std::string& binary);
-std::string Base64Decode(const std::string& base64);
+//bool EncryptStringWithDPAPI(const std::string& plaintext, std::string& ciphertext);
+//bool DecryptStringWithDPAPI(const std::string& ciphertext, std::string& plaintext);
+//std::string Base64Encode(const std::string& binary);
+//std::string Base64Decode(const std::string& base64);
+//再见 已经移入平台和main.cpp有关处了 

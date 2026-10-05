@@ -1,6 +1,6 @@
 #define NOMINMAX
+#include "platform/platform.h"
 #include "IconManager.h"
-#include "texture_utils.h"  // 确保提供了 CreateTextureFromRGBA 的声明
 #define NANOSVG_IMPLEMENTATION
 #include "nanosvg.h"
 #define NANOSVGRAST_IMPLEMENTATION
@@ -9,13 +9,11 @@
 #include <cstring>
 #include <fstream>
 #include <vector>
+#include <cstdio>       // ← 为了 snprintf
+#include <cmath>        // ← 为了 powf
 
-extern ID3D11ShaderResourceView* CreateTextureFromRGBA(const std::vector<unsigned char>& rgbaData, int width, int height, ID3D11Device* device);
 
-
-
-void IconManager::Initialize(ID3D11Device* device) {
-    m_device = device;
+void IconManager::Initialize() {//空实现
 }
 
 void IconManager::Shutdown() {
@@ -51,8 +49,7 @@ static std::string ReplaceFillColor(const std::string& svgContent, DWORD color) 
     return result;
 }
 
-ID3D11ShaderResourceView* IconManager::LoadIconWithColor(const std::string& svgPath, int width, int height, DWORD color) {
-    if (!m_device) return nullptr;
+TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath, int width, int height, uint32_t color) {
 
     // 读取文件
     std::ifstream file(svgPath, std::ios::binary | std::ios::ate);
@@ -111,11 +108,11 @@ ID3D11ShaderResourceView* IconManager::LoadIconWithColor(const std::string& svgP
     nsvgDeleteRasterizer(rast);
     nsvgDelete(nsvgImage);
 
-    ID3D11ShaderResourceView* texture = CreateTextureFromRGBA(imgData, width, height, m_device);
+    ID3D11ShaderResourceView* texture = CreateTextureFromRGBA(imgData, width, height);
     return texture;
 }
 
-ID3D11ShaderResourceView* IconManager::LoadIcon(const std::string& svgPath, int width, int height, DWORD color) {
+TextureHandle IconManager::LoadIcon(const std::string& svgPath, int width, int height, uint32_t color) {
     std::string cacheKey = svgPath + "_" + std::to_string(color);
     auto it = m_cache.find(cacheKey);
     if (it != m_cache.end() && it->second.texture) {
@@ -134,14 +131,14 @@ ID3D11ShaderResourceView* IconManager::LoadIcon(const std::string& svgPath, int 
     return tex;
 }
 
-ID3D11ShaderResourceView* IconManager::GetIcon(const std::string& svgPath, DWORD color) {
+TextureHandle IconManager::GetIcon(const std::string& svgPath, uint32_t color) {
     std::string cacheKey = svgPath + "_" + std::to_string(color);
     auto it = m_cache.find(cacheKey);
     if (it != m_cache.end()) return it->second.texture;
     return nullptr;
 }
 
-void IconManager::SetThemeColor(DWORD color) {
+void IconManager::SetThemeColor(uint32_t color) {
     if (m_currentThemeColor == color) return;
     m_currentThemeColor = color;
     for (auto& pair : m_cache) {

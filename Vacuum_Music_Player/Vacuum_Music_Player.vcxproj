@@ -80,7 +80,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_WINSOCKAPI_</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -94,7 +94,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_WINSOCKAPI_</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -108,7 +108,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0;_WINSOCKAPI_</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -137,7 +137,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0;_WINSOCKAPI_</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)noson-2.12.24\noson\src;$(SolutionDir)noson-2.12.24\build_vc\noson\public\noson;D:\taglib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -214,9 +214,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manageconfig.cpp" />
     <ClCompile Include="NeteaseAPIManager.cpp" />
+    <ClCompile Include="platform\platform_windows.cpp" />
     <ClCompile Include="SettingItem.cpp" />
     <ClCompile Include="SonosController.cpp" />
-    <ClCompile Include="texture_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\httplib.h" />
@@ -288,10 +288,10 @@
     <ClInclude Include="IconManager.h" />
     <ClInclude Include="manageconfig.h" />
     <ClInclude Include="NeteaseAPIManager.h" />
+    <ClInclude Include="platform\platform.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="SettingItem.h" />
     <ClInclude Include="SonosController.h" />
-    <ClInclude Include="texture_utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />

@@ -1,5 +1,6 @@
 #include "SonosController.h"
 
+#include <platform/platform.h>
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -11,17 +12,14 @@
 #include <iomanip>
 #include <thread>
 #include <unordered_set>
-#include <windows.h>
 // noson 库头文件
 #include <sonossystem.h>
 #include <sonosplayer.h>
 // cpp-httplib（header-only）
 #include <httplib.h>
 
-#pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "iphlpapi.lib")
 
-extern HWND g_hWnd;
+extern WindowHandle g_hWnd;
 
 
 #ifndef WM_SONOS_STOPPED
@@ -29,16 +27,6 @@ extern HWND g_hWnd;
 #endif
 // ================= 工具函数 =================
 namespace {
-    std::string PathToUTF8(const std::string& localPath) {
-        std::filesystem::path p(localPath);
-        std::wstring wstr = p.wstring();
-        if (wstr.empty()) return "";
-        int len = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        if (len <= 0) return "";
-        std::vector<char> buf(len);
-        WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, buf.data(), len, nullptr, nullptr);
-        return std::string(buf.data());
-    }
 
     std::string URLEncode(const std::string& str) {
         std::ostringstream escaped;
@@ -77,21 +65,16 @@ namespace {
 
     std::vector<AdapterInfo> GetPhysicalAdapters() {
         std::vector<AdapterInfo> result;
-        ULONG size = 0;
-        GetAdaptersInfo(nullptr, &size);
-        std::vector<BYTE> buf(size);
-        PIP_ADAPTER_INFO adapter = reinterpret_cast<PIP_ADAPTER_INFO>(buf.data());
-        if (GetAdaptersInfo(adapter, &size) != ERROR_SUCCESS)
-            return result;
 
-        for (PIP_ADAPTER_INFO p = adapter; p; p = p->Next) {
-            std::string ip = p->IpAddressList.IpAddress.String;
-            if (ip.empty() || ip == "0.0.0.0" || ip == "127.0.0.1")
-                continue;
+        auto adapters = EnumNetworkAdapters();   // ← 平台函数
 
-            std::string desc = p->Description;
-            std::string lowerDesc = ToLower(desc);
+        for (const auto& adp : adapters) {
+            std::string ip = adp.ip;
+            if (ip == "127.0.0.1") continue;      // loopback
 
+            std::string lowerDesc = ToLower(adp.description);
+
+            // 过滤虚拟网卡（业务逻辑保留）
             if (lowerDesc.find("virtual") != std::string::npos ||
                 lowerDesc.find("hyper-v") != std::string::npos ||
                 lowerDesc.find("vmware") != std::string::npos ||
@@ -105,12 +88,13 @@ namespace {
 
             AdapterInfo info;
             info.ip = ip;
-            info.description = desc;
-            info.hasGateway = (strcmp(p->GatewayList.IpAddress.String, "0.0.0.0") != 0);
+            info.description = adp.description;
+            info.hasGateway = adp.hasGateway;
 
+            // 打分（业务逻辑保留）
             info.priorityScore = 0;
-            if (p->Type == MIB_IF_TYPE_ETHERNET) info.priorityScore += 10;
-            else if (p->Type == IF_TYPE_IEEE80211) info.priorityScore += 5;
+            if (adp.type == 1) info.priorityScore += 10;   // ethernet
+            else if (adp.type == 2) info.priorityScore += 5;    // wifi
 
             if (lowerDesc.find("intel") != std::string::npos) info.priorityScore += 15;
             if (lowerDesc.find("gigabit") != std::string::npos ||
@@ -126,7 +110,7 @@ namespace {
                 lowerDesc.find("gaming") != std::string::npos) info.priorityScore += 5;
             if (info.hasGateway) info.priorityScore += 5;
 
-            result.push_back(info);
+            result.push_back(std::move(info));
         }
 
         std::sort(result.begin(), result.end(),
@@ -393,10 +377,10 @@ struct SonosController::Impl {
         // 确保丢掉多余的空字符（其实 ipStr 复制进来时自动截断了）
         return ip.c_str();   // 或者直接 return ip;
     }
-    bool StartHttpServer(const std::wstring& musicFolder, int port) {
-        // 1. 检查文件夹（直接使用宽字符路径）
+    bool StartHttpServer(const PathType& musicFolder, int port) {
+        // 1. 检查文件夹
         if (!std::filesystem::exists(musicFolder)) {
-            OutputDebugStringA("[StartHttpServer] FAIL: folder does not exist\n");
+            OutputDebugStringA("[StartHttpServer] FAIL: folder does not exist");
             return false;
         }
 
@@ -407,28 +391,26 @@ struct SonosController::Impl {
         // 3. 端口有效性
         serverPort = port;
         if (serverPort <= 0 || serverPort > 65535) {
-            OutputDebugStringA("[StartHttpServer] FAIL: invalid port\n");
+            OutputDebugStringA("[StartHttpServer] FAIL: invalid port");
             return false;
         }
 
-        // 4. 路径转为 UTF‑8（用于 httplib）
-        int len = WideCharToMultiByte(CP_UTF8, 0, musicFolder.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        if (len <= 0) {
-            OutputDebugStringA("[StartHttpServer] FAIL: WideCharToMultiByte error\n");
+        // 4. 路径转为 UTF-8（用平台函数）
+        musicPath = PathToUtf8(musicFolder);   // ← 一行搞定
+        if (musicPath.empty()) {
+            OutputDebugStringA("[StartHttpServer] FAIL: PathToUtf8 error");
             return false;
         }
-        std::string utf8Path(len - 1, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, musicFolder.c_str(), -1, &utf8Path[0], len, nullptr, nullptr);
-        musicPath = utf8Path;  // 保存 UTF‑8 版本，供 ListMusicFiles 等使用
 
-        // 5. 启动 HTTP 线程
+        // 5. 启动 HTTP 线程（参数传值拷贝，避免悬垂）
+        std::string utf8Path = musicPath;
         httpRunning = true;
         httpThread = std::thread([this, utf8Path, port]() {
             httplib::Server svr;
             svr.set_mount_point("/", utf8Path.c_str());
             httpServer = &svr;
             if (!svr.listen("0.0.0.0", port)) {
-                OutputDebugStringA("[StartHttpServer] FAIL: listen failed\n");
+                OutputDebugStringA("[StartHttpServer] FAIL: listen failed");
             }
             httpServer = nullptr;
             httpRunning = false;
@@ -455,13 +437,9 @@ struct SonosController::Impl {
                 std::string ext = entry.path().extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
                 if (ext == ".mp3" || ext == ".flac" || ext == ".wav" || ext == ".wma" || ext == ".m4a") {
-                    std::wstring wname = entry.path().filename().wstring();
-                    int len = WideCharToMultiByte(CP_UTF8, 0, wname.c_str(), -1, nullptr, 0, nullptr, nullptr);
-                    if (len > 0) {
-                        std::string utf8name(len - 1, '\0');
-                        WideCharToMultiByte(CP_UTF8, 0, wname.c_str(), -1, &utf8name[0], len, nullptr, nullptr);
-                        files.push_back(utf8name);
-                    }
+                    auto u8name = entry.path().filename().u8string();
+                    std::string utf8name(reinterpret_cast<const char*>(u8name.data()), u8name.size());
+                    files.push_back(utf8name);
                 }
             }
         }
@@ -613,7 +591,7 @@ bool SonosController::ConnectToDevice(const std::string& location) {
     return true;
 }
 
-bool SonosController::StartHttpServer(const std::wstring& musicFolder, int port) {
+bool SonosController::StartHttpServer(const PathType& musicFolder, int port) {
     return pImpl->StartHttpServer(musicFolder, port);
 }
 

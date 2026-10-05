@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\imgui\imgui.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -165,9 +162,6 @@
     <ClCompile Include="SettingItem.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="texture_utils.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="IconManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -175,6 +169,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="AMLLWebSocketV2.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="platform\platform_windows.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -380,9 +380,6 @@
     <ClInclude Include="SettingItem.h">
       <Filter>源文件</Filter>
     </ClInclude>
-    <ClInclude Include="texture_utils.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
     <ClInclude Include="IconManager.h">
       <Filter>源文件</Filter>
     </ClInclude>
@@ -396,6 +393,9 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="AMLLWebSocketV2.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="platform\platform.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

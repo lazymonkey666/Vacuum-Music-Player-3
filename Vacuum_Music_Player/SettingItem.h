@@ -1,4 +1,5 @@
 #pragma once
+#include <platform/platform.h>
 #include <vector>
 #include <string>
 #include <functional>
@@ -6,65 +7,14 @@
 #include <memory>
 #include <sstream>
 #include <type_traits>
-#include <windows.h>
 #include "manageconfig.h"
-#include <texture_utils.h>
-#include <resource.h>
+#include <cstdio>
+
 
 // forward declare PickFolderDialog (avoid including .cpp). Do not repeat default parameter here.
-std::string PickFolderDialog(HWND hwndOwner);
+std::string PickFolderDialog(WindowHandle hwndOwner);
 #include <typeinfo>
-#include <shellapi.h>  // 在文件开头添加
-#pragma comment(lib, "Version.lib")
 
-
-inline std::string WCharToString(const wchar_t* wstr, UINT codePage = CP_UTF8) {
-    if (!wstr || !*wstr) return std::string();
-
-    int len = WideCharToMultiByte(codePage, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
-    if (len == 0) return std::string();
-
-    std::string result(len - 1, '\0'); // -1 排除结尾的 L'\0'
-    WideCharToMultiByte(codePage, 0, wstr, -1, &result[0], len, nullptr, nullptr);
-    return result;
-}
-
-inline std::string GetFileVersionString()
-{
-    TCHAR szFullPath[MAX_PATH] = { 0 };
-    GetModuleFileName(NULL, szFullPath, MAX_PATH);  // 获取当前程序路径
-
-    DWORD dwHandle = 0;
-    DWORD dwSize = GetFileVersionInfoSize(szFullPath, &dwHandle);
-    if (dwSize == 0) return "未知";
-
-    BYTE* pBuffer = new BYTE[dwSize];
-    if (!GetFileVersionInfo(szFullPath, dwHandle, dwSize, pBuffer)) {
-        delete[] pBuffer;
-        return "未知";
-    }
-
-    VS_FIXEDFILEINFO* pFileInfo = nullptr;
-    UINT uLen = 0;
-    if (!VerQueryValue(pBuffer, L"\\", (LPVOID*)&pFileInfo, &uLen)) {
-        delete[] pBuffer;
-        return "未知";
-    }
-
-    // 提取版本号各部分
-    int major = HIWORD(pFileInfo->dwFileVersionMS);
-    int minor = LOWORD(pFileInfo->dwFileVersionMS);
-    int build = HIWORD(pFileInfo->dwFileVersionLS);
-    int revision = LOWORD(pFileInfo->dwFileVersionLS);
-
-    delete[] pBuffer;
-
-    wchar_t version[64];
-    if (revision != 0) { swprintf(version, 64, L"%d.%d.%d.%d", major, minor, build, revision);  }
-    else{ swprintf(version, 64, L"%d.%d.%d", major, minor, build); }
-    
-    return WCharToString(version);
-}
 
 // 基础设置项
 struct SettingItemBase {
@@ -86,7 +36,7 @@ inline bool InputTextWithBrowse(const char* label, char* buf, size_t bufSize, co
     if (ImGui::Button(buttonLabel)) {
         std::string folder = PickFolderDialog(NULL);  // 使用 NULL 或者传入合适的 HWND
         if (!folder.empty()) {
-            strncpy_s(buf, bufSize, folder.c_str(), bufSize - 1);
+            std::snprintf(buf, bufSize, "%s", folder.c_str());
             changed = true;        }
     }
     ImGui::PopID();
@@ -175,7 +125,7 @@ struct SettingItem<std::string> : SettingItemBase {
     SettingItem(std::string& val, const char* key, const char* lbl) : value(val), name(key), label(lbl) {}
     void render() override {
         char buf[512];
-        strncpy(buf, value.c_str(), sizeof(buf));
+        std::snprintf(buf, sizeof(buf), "%s", value.c_str());
         ImGui::Text(label);
         if (InputTextWithBrowse(label, buf, sizeof(buf))) {
             value = buf;
@@ -195,8 +145,7 @@ struct SettingItemText : SettingItemBase {
 
     void render() override {
         char buf[512];
-        strncpy(buf, value.c_str(), sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';
+        std::snprintf(buf, sizeof(buf), "%s", value.c_str());
         ImGui::Text(label);
         std::string tmp = label;
         if (ImGui::InputText(("##" + tmp).c_str(), buf, sizeof(buf))) {
@@ -338,15 +287,13 @@ struct SettingItemAbout : SettingItemBase {
     SettingItemAbout(const char* key, const char* lbl) : name(key), label(lbl) {}
 
     void render() override {
-        static ID3D11ShaderResourceView* iconSRV = nullptr;
+        static TextureHandle iconSRV = nullptr;      // ← ID3D11ShaderResourceView* → TextureHandle
         static int iconWidth = 0, iconHeight = 0;
 
         if (!iconSRV) {
-            // 这里的资源 ID 请替换成你的实际 ID，例如 IDB_PNG1
-            // 第二个参数是资源类型，通常为 L"PNG"
-            bool ok = LoadTextureFromResource(IDB_PNG1, L"PNG", &iconSRV, &iconWidth, &iconHeight);
-            if (!ok) {
-                // 如果失败，可以尝试其他类型，比如 RT_RCDATA 或 L"PNG"
+            // 直接接收返回值
+            iconSRV = LoadAppIcon(&iconWidth, &iconHeight);
+            if (!iconSRV) {
                 ImGui::Text("(图标加载失败)");
             }
         }
@@ -367,16 +314,16 @@ struct SettingItemAbout : SettingItemBase {
         ImGui::Text(realVersionDisplay.c_str());          // 你可以从资源或宏读取版本号
         ImGui::Text("作者: lazymonkey666");
         if (ImGui::Button("本产品遵循GPL-3.0 or later许可证")) {
-            ShellExecuteA(NULL, "open", "https://www.gnu.org/licenses/gpl-3.0.html", NULL, NULL, SW_SHOWNORMAL);
+            OpenUrlInBrowser("https://www.gnu.org/licenses/gpl-3.0.html");
         }
         ImGui::Separator();
 
         // GitHub 仓库链接（可点击）
         if (ImGui::Button("仓库链接")) {
-            ShellExecuteA(NULL, "open", "https://github.com/lazymonkey666/Vacuum-Music-Player-3/", NULL, NULL, SW_SHOWNORMAL);
+            OpenUrlInBrowser("https://github.com/lazymonkey666/Vacuum-Music-Player-3/");
         }
         if (ImGui::Button("作者链接")) {
-            ShellExecuteA(NULL, "open", "https://github.com/lazymonkey666", NULL, NULL, SW_SHOWNORMAL);
+            OpenUrlInBrowser("https://github.com/lazymonkey666");
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);

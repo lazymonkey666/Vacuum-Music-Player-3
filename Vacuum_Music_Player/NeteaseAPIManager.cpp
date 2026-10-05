@@ -373,71 +373,6 @@ std::string NeteaseAPIManager::GetCurrentCookie() const {
     std::lock_guard<std::mutex> lock(m_mutex);
     return !m_userCookie.empty() ? m_userCookie : m_guestCookie;
 }
-//工具函数 用于主程序调用存储cookie时加密和解密
-bool EncryptStringWithDPAPI(const std::string& plaintext, std::string& ciphertext) {
-    DATA_BLOB input{};
-    input.pbData = const_cast<BYTE*>(reinterpret_cast<const BYTE*>(plaintext.data()));
-    input.cbData = static_cast<DWORD>(plaintext.size());
-
-    DATA_BLOB output{};
-    if (!CryptProtectData(&input, L"AppCookie", nullptr, nullptr, nullptr, 0, &output))
-        return false;
-
-    ciphertext.assign(reinterpret_cast<char*>(output.pbData), output.cbData);
-    LocalFree(output.pbData);
-    return true;
-}
-
-bool DecryptStringWithDPAPI(const std::string& ciphertext, std::string& plaintext) {
-    DATA_BLOB input{};
-    input.pbData = const_cast<BYTE*>(reinterpret_cast<const BYTE*>(ciphertext.data()));
-    input.cbData = static_cast<DWORD>(ciphertext.size());
-
-    DATA_BLOB output{};
-    if (!CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr, 0, &output))
-        return false;
-
-    plaintext.assign(reinterpret_cast<char*>(output.pbData), output.cbData);
-    LocalFree(output.pbData);
-    return true;
-}
-
-std::string Base64Encode(const std::string& binary) {
-    DWORD size = 0;
-    CryptBinaryToStringA(
-        reinterpret_cast<const BYTE*>(binary.data()),
-        static_cast<DWORD>(binary.size()),
-        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        nullptr, &size
-    );
-    std::string result(size, 0);
-    CryptBinaryToStringA(
-        reinterpret_cast<const BYTE*>(binary.data()),
-        static_cast<DWORD>(binary.size()),
-        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        result.data(), &size
-    );
-    if (!result.empty() && result.back() == '\0') result.pop_back(); // 移除结尾空字符
-    return result;
-}
-
-std::string Base64Decode(const std::string& base64) {
-    DWORD size = 0;
-    CryptStringToBinaryA(
-        base64.c_str(),
-        static_cast<DWORD>(base64.size()),
-        CRYPT_STRING_BASE64,
-        nullptr, &size, nullptr, nullptr
-    );
-    std::string result(size, 0);
-    CryptStringToBinaryA(
-        base64.c_str(),
-        static_cast<DWORD>(base64.size()),
-        CRYPT_STRING_BASE64,
-        reinterpret_cast<BYTE*>(result.data()), &size, nullptr, nullptr
-    );
-    return result;
-}
 
 bool NeteaseAPIManager::SendCaptcha(const std::string& phone) {
     try {
@@ -493,4 +428,18 @@ void NeteaseAPIManager::ClearUserCookie() {
     if (m_enableGuest && !m_guestLoggedIn) {
         LoginAsGuest();
     }
+}
+std::string NeteaseAPIManager::GetNeteaseUserName() {
+    try {
+        auto resp = Request("/user/account", {});
+        if (resp.contains("code") && resp["code"].get<int>() == 200) {
+            if (resp.contains("profile") && resp["profile"].contains("nickname")) {
+                return resp["profile"]["nickname"].get<std::string>();
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        OutputDebugStringA(("获取用户名失败: " + std::string(e.what()) + "\n").c_str());
+    }
+    return "";
 }

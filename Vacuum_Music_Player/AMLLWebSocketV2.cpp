@@ -1,5 +1,5 @@
 #include "AMLLWebSocketV2.h"
-#include <iostream>
+#include <platform/platform.h>
 #include <sstream>
 #include <regex>
 #include <iomanip>
@@ -8,7 +8,7 @@
 #include <ixwebsocket/IXNetSystem.h>
 #include <algorithm>
 
-extern HWND g_hWnd;
+extern WindowHandle g_hWnd;
 
 // ========== 辅助：XML 转义（内部） ==========
 namespace {
@@ -329,20 +329,13 @@ void AMLLWebSocketClient::start() {
 
 void AMLLWebSocketClient::stop() {
     running_ = false;
-    if (progressThread_ && progressThread_->joinable())
-        progressThread_->join();
     webSocket_.stop();
-}
-
-void AMLLWebSocketClient::waitForExit() {
-    std::cout << "\n按回车键退出..." << std::endl;
-    std::cin.get();
 }
 
 // ========== 内部 JSON 发送辅助 ==========
 void AMLLWebSocketClient::sendJson(const json& msg) {
     if (webSocket_.getReadyState() != ix::ReadyState::Open) {
-        std::cout << "[AMLL] WebSocket未打开，丢弃消息" << std::endl;
+        OutputDebugStringA("[AMLL] WebSocket未打开，丢弃消息\n");
         return;
     }
     std::string str = msg.dump();
@@ -376,12 +369,12 @@ void AMLLWebSocketClient::sendMusicInfo(const std::string& musicId,
     value["artists"] = artistArray;
     value["duration"] = durationMs;
     sendJson(makeStateMsg(value));
-    std::cout << "[AMLL] 发送音乐信息 (V2 JSON)" << std::endl;
+    OutputDebugStringA("[AMLL] 发送音乐信息 (V2 JSON)\n");
 }
 
 void AMLLWebSocketClient::sendAlbumCover(const std::vector<uint8_t>& imageData) {
     if (imageData.empty()) {
-        std::cout << "[AMLL] 封面数据为空，跳过发送" << std::endl;
+        OutputDebugStringA("[AMLL] 封面数据为空，跳过发送\n");
         return;
     }
     json value;
@@ -390,13 +383,13 @@ void AMLLWebSocketClient::sendAlbumCover(const std::vector<uint8_t>& imageData) 
     value["image"]["data"] = base64_encode(imageData);
     value["image"]["mimeType"] = "image/png";
     sendJson(makeStateMsg(value));
-    std::cout << "[AMLL] 发送专辑封面 (V2 JSON)，大小: " << imageData.size() << " 字节" << std::endl;
+    OutputDebugStringA("[AMLL] 发送专辑封面 (V2 JSON)\n");
 }
 
 void AMLLWebSocketClient::sendLyricFromLRC(const std::string& lrcContent, bool enableSplit) {
     auto lines = convertLRCToStructured(lrcContent, 5000, enableSplit);
     if (lines.empty()) {
-        std::cout << "[AMLL] LRC 转换失败或无歌词" << std::endl;
+        OutputDebugStringA("[AMLL] LRC 转换失败或无歌词\n");
         return;
     }
 
@@ -426,28 +419,27 @@ void AMLLWebSocketClient::sendLyricFromLRC(const std::string& lrcContent, bool e
     value["lines"] = linesArray;
 
     sendJson(makeStateMsg(value));
-    std::cout << "[AMLL] 发送结构化歌词 (V2 JSON)，共 " << lines.size() << " 行";
+    OutputDebugStringA(("[AMLL] 发送结构化歌词 (V2 JSON) \n"));
     if (enableSplit) {
-        std::cout << "，已启用翻译分割";
+        OutputDebugStringA("[AMLL] ，已启用翻译分割\n");
     }
     else {
-        std::cout << "，未启用翻译分割";
+        OutputDebugStringA("[AMLL] ，未启用翻译分割\n");
     }
-    std::cout << std::endl;
 }
 
 void AMLLWebSocketClient::sendResumed() {
     json value;
     value["update"] = "resumed";
     sendJson(makeStateMsg(value));
-    std::cout << "[AMLL] 发送恢复播放 (V2 JSON)" << std::endl;
+    OutputDebugStringA("[AMLL] 发送恢复播放 (V2 JSON)\n");
 }
 
 void AMLLWebSocketClient::sendPaused() {
     json value;
     value["update"] = "paused";
     sendJson(makeStateMsg(value));
-    std::cout << "[AMLL] 发送暂停 (V2 JSON)" << std::endl;
+    OutputDebugStringA("[AMLL] 发送暂停 (V2 JSON)\n");
 }
 
 void AMLLWebSocketClient::sendProgress(uint64_t posMs) {
@@ -463,7 +455,7 @@ void AMLLWebSocketClient::sendAlbumCoverByURI(const std::string& dataUri) {
     value["source"] = "uri";
     value["url"] = dataUri;
     sendJson(makeStateMsg(value));
-    std::cout << "[AMLL] 发送封面 URI (V2 JSON)" << std::endl;
+    OutputDebugStringA("[AMLL] 发送封面 URI (V2 JSON)\n");
 }
 
 uint64_t AMLLWebSocketClient::getPendingSeek() {
@@ -507,25 +499,24 @@ void AMLLWebSocketClient::sendInitialData() {
     json init;
     init["type"] = "initialize";
     sendJson(init);
-    std::cout << "[AMLL] 发送初始化消息 (V2)" << std::endl;
+    OutputDebugStringA("[AMLL] 发送初始化消息 (V2)\n");
 
     // 2. 发送示例数据
     std::vector<Artist> artists = { {"artist_0", "Unknown Artist"} };
     sendMusicInfo("song_0", "Unknown Data", "album_0", "Unknown Album", artists, 100);
     sendLyricFromLRC(getDemoLRC(),false);
-    std::cout << "-------------------------" << std::endl;
 }
 
 // ========== 消息回调 ==========
 void AMLLWebSocketClient::onMessage(const ix::WebSocketMessagePtr& msg) {
     if (msg->type == ix::WebSocketMessageType::Open) {
-        std::cout << "[AMLL] WebSocket 连接成功" << std::endl;
+        OutputDebugStringA("[AMLL] WebSocket 连接成功\n");
         connected_ = true;
         sendInitialData();   // 仅在连接成功后发送初始化
     }
     else if (msg->type == ix::WebSocketMessageType::Message) {
         if (msg->binary) {
-            std::cout << "[AMLL] 收到二进制消息，忽略" << std::endl;
+            OutputDebugStringA("[AMLL] 收到二进制消息，忽略\n");
             return;
         }
         try {
@@ -566,21 +557,20 @@ void AMLLWebSocketClient::onMessage(const ix::WebSocketMessagePtr& msg) {
                 json pong;
                 pong["type"] = "pong";
                 sendJson(pong);
-                std::cout << "[AMLL] 响应 Pong" << std::endl;
             }
             else if (type == "initialize") {
                 // 忽略
             }
         }
         catch (const std::exception& e) {
-            std::cout << "[AMLL] JSON 解析错误: " << e.what() << std::endl;
+            OutputDebugStringA("[AMLL] JSON 解析错误 \n");
         }
     }
     else if (msg->type == ix::WebSocketMessageType::Error) {
-        std::cout << "[AMLL] 错误: " << msg->errorInfo.reason << std::endl;
+        OutputDebugStringA("[AMLL] 错误:\n") ;
     }
     else if (msg->type == ix::WebSocketMessageType::Close) {
-        std::cout << "[AMLL] 连接关闭" << std::endl;
+        OutputDebugStringA("[AMLL] 连接关闭\n");
         connected_ = false;
     }
 }

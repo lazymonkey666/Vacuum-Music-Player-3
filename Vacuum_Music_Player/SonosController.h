@@ -1,12 +1,6 @@
 #pragma once
 
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _WIN32_WINNT 0x0A00
-
-#include <WinSock2.h>
-#include <Windows.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
+#include <platform/platform.h>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -40,7 +34,7 @@ public:
     bool ConnectToDevice(const std::string& location);
 
     // 启动本地 HTTP 文件服务器（挂载音乐文件夹）
-    bool StartHttpServer(const std::wstring& musicFolder, int port);
+    bool StartHttpServer(const PathType& musicFolder, int port);
     void SetPlayMode();
 
     // 停止 HTTP 服务器

@@ -1,5 +1,6 @@
 // albumimgtagreader.cpp
 #include "albumimgtagreader.h"
+#include <platform/platform.h>
 #include <taglib/mpegfile.h>
 #include <taglib/id3v2tag.h>
 #include <taglib/attachedpictureframe.h>
@@ -15,11 +16,9 @@
 #include <taglib/attachedpictureframe.h>
 #include <algorithm>
 #include <cctype>
-#include <wincodec.h>
 #include <cmath>
 #include <vector>
 #include <filesystem>
-#pragma comment(lib, "windowscodecs.lib")
 
 // 预计算高斯权重表（由于半径随 x 变化，最多 81 种半径）
 static std::vector<float> ComputeGaussianWeights(float radius) {
@@ -128,78 +127,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
     pixels = std::move(result);
 }
 
-// 辅助函数：使用 WIC 解码图片并缩放到指定尺寸，返回 RGBA 像素数据
-static std::vector<unsigned char> DecodeAndScaleImage(const std::vector<unsigned char>& imageData, int targetWidth, int targetHeight) {
-    if (imageData.empty()) return {};
-
-    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    IWICImagingFactory* wicFactory = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wicFactory));
-    if (FAILED(hr)) {
-        CoUninitialize();
-        return {};
-    }
-
-    // 创建内存流
-    IWICStream* stream = nullptr;
-    hr = wicFactory->CreateStream(&stream);
-    if (SUCCEEDED(hr)) {
-        hr = stream->InitializeFromMemory(const_cast<BYTE*>(imageData.data()), (DWORD)imageData.size());
-        if (SUCCEEDED(hr)) {
-            IWICBitmapDecoder* decoder = nullptr;
-            hr = wicFactory->CreateDecoderFromStream(stream, nullptr, WICDecodeMetadataCacheOnLoad, &decoder);
-            if (SUCCEEDED(hr)) {
-                IWICBitmapFrameDecode* frame = nullptr;
-                hr = decoder->GetFrame(0, &frame);
-                if (SUCCEEDED(hr)) {
-                    // 获取原始尺寸
-                    UINT origWidth, origHeight;
-                    frame->GetSize(&origWidth, &origHeight);
-
-                    // 创建 IWICBitmapScaler 进行缩放
-                    IWICBitmapScaler* scaler = nullptr;
-                    hr = wicFactory->CreateBitmapScaler(&scaler);
-                    if (SUCCEEDED(hr)) {
-                        hr = scaler->Initialize(frame, targetWidth, targetHeight, WICBitmapInterpolationModeFant);
-                        if (SUCCEEDED(hr)) {
-                            // 转换为 RGBA 格式
-                            IWICFormatConverter* converter = nullptr;
-                            hr = wicFactory->CreateFormatConverter(&converter);
-                            if (SUCCEEDED(hr)) {
-                                hr = converter->Initialize(scaler, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
-                                if (SUCCEEDED(hr)) {
-                                    // 复制像素数据
-                                    UINT stride = targetWidth * 4;
-                                    UINT bufferSize = stride * targetHeight;
-                                    std::vector<unsigned char> pixelData(bufferSize);
-                                    hr = converter->CopyPixels(nullptr, stride, bufferSize, pixelData.data());
-                                    if (SUCCEEDED(hr)) {
-                                        converter->Release();
-                                        scaler->Release();
-                                        frame->Release();
-                                        decoder->Release();
-                                        stream->Release();
-                                        wicFactory->Release();
-                                        CoUninitialize();
-                                        return pixelData;
-                                    }
-                                }
-                                converter->Release();
-                            }
-                        }
-                        scaler->Release();
-                    }
-                    frame->Release();
-                }
-                decoder->Release();
-            }
-        }
-        stream->Release();
-    }
-    wicFactory->Release();
-    CoUninitialize();
-    return {};
-}
 
 // 新增函数：应用渐变透明效果
 std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigned char>& imageData, int targetWidth, int targetHeight) {
@@ -238,109 +165,17 @@ std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigne
     return pixelData;
 }
 
-std::vector<unsigned char> ConvertImageToJPEG(const std::vector<unsigned char>& inputImageData) {
-    if (inputImageData.empty()) return {};
-
-    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    IWICImagingFactory* factory = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
-    if (FAILED(hr)) {
-        CoUninitialize();
-        return {};
-    }
-
-    // 创建输入流
-    IWICStream* inputStream = nullptr;
-    hr = factory->CreateStream(&inputStream);
-    if (SUCCEEDED(hr)) {
-        hr = inputStream->InitializeFromMemory(const_cast<BYTE*>(inputImageData.data()), (DWORD)inputImageData.size());
-        if (SUCCEEDED(hr)) {
-            IWICBitmapDecoder* decoder = nullptr;
-            hr = factory->CreateDecoderFromStream(inputStream, nullptr, WICDecodeMetadataCacheOnLoad, &decoder);
-            if (SUCCEEDED(hr)) {
-                IWICBitmapFrameDecode* frame = nullptr;
-                hr = decoder->GetFrame(0, &frame);
-                if (SUCCEEDED(hr)) {
-                    // 创建 JPEG 编码器
-                    IWICBitmapEncoder* encoder = nullptr;
-                    hr = factory->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, &encoder);
-                    if (SUCCEEDED(hr)) {
-                        // 创建输出流（内存）
-                        IWICStream* outputStream = nullptr;
-                        hr = factory->CreateStream(&outputStream);
-                        if (SUCCEEDED(hr)) {
-                            hr = outputStream->InitializeFromMemory(nullptr, 0);
-                            if (SUCCEEDED(hr)) {
-                                hr = encoder->Initialize(outputStream, WICBitmapEncoderNoCache);
-                                if (SUCCEEDED(hr)) {
-                                    IWICBitmapFrameEncode* frameEncode = nullptr;
-                                    hr = encoder->CreateNewFrame(&frameEncode, nullptr);
-                                    if (SUCCEEDED(hr)) {
-                                        hr = frameEncode->Initialize(nullptr);
-                                        if (SUCCEEDED(hr)) {
-                                            hr = frameEncode->WriteSource(frame, nullptr);
-                                            if (SUCCEEDED(hr)) {
-                                                hr = frameEncode->Commit();
-                                                if (SUCCEEDED(hr)) {
-                                                    hr = encoder->Commit();
-                                                    if (SUCCEEDED(hr)) {
-                                                        // 获取输出数据大小
-                                                        STATSTG stat;
-                                                        hr = outputStream->Stat(&stat, STATFLAG_NONAME);
-                                                        if (SUCCEEDED(hr)) {
-                                                            ULONG size = (ULONG)stat.cbSize.QuadPart;
-                                                            std::vector<unsigned char> jpegData(size);
-                                                            outputStream->Seek({ 0 }, STREAM_SEEK_SET, nullptr);
-                                                            ULONG bytesRead = 0;
-                                                            outputStream->Read(jpegData.data(), size, &bytesRead);
-                                                            if (bytesRead == size) {
-                                                                frameEncode->Release();
-                                                                encoder->Release();
-                                                                outputStream->Release();
-                                                                frame->Release();
-                                                                decoder->Release();
-                                                                inputStream->Release();
-                                                                factory->Release();
-                                                                CoUninitialize();
-                                                                return jpegData;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        frameEncode->Release();
-                                    }
-                                }
-                                outputStream->Release();
-                            }
-                        }
-                        encoder->Release();
-                    }
-                    frame->Release();
-                }
-                decoder->Release();
-            }
-        }
-        inputStream->Release();
-    }
-    factory->Release();
-    CoUninitialize();
-    return {};
-}
-
 
 // 获取扩展名（小写）
-static std::wstring GetExtension(const std::wstring& path) {
-    size_t dot = path.find_last_of(L'.');
-    if (dot == std::wstring::npos) return L"";
-    std::wstring ext = path.substr(dot + 1);
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
+static std::string GetExtension(const PathType& path) {
+    std::string ext = std::filesystem::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    if (!ext.empty() && ext[0] == '.') ext.erase(0, 1);   // ← 去掉前导点
     return ext;
 }
 
 // ---------- MP3 ----------
-static std::vector<unsigned char> ExtractFromMP3(const std::wstring& widePath) {
+static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
     TagLib::MPEG::File file(widePath.c_str());
     if (!file.isValid() || !file.ID3v2Tag()) return {};
 
@@ -368,7 +203,7 @@ static std::vector<unsigned char> ExtractFromMP3(const std::wstring& widePath) {
 }
 
 // ---------- FLAC ----------
-static std::vector<unsigned char> ExtractFromFLAC(const std::wstring& widePath) {
+static std::vector<unsigned char> ExtractFromFLAC(const PathType& widePath) {
     TagLib::FLAC::File file(widePath.c_str());
     if (!file.isValid()) return {};
 
@@ -388,7 +223,7 @@ static std::vector<unsigned char> ExtractFromFLAC(const std::wstring& widePath) 
 }
 
 // ---------- M4A / MP4 ----------
-static std::vector<unsigned char> ExtractFromM4A(const std::wstring& widePath) {
+static std::vector<unsigned char> ExtractFromM4A(const PathType& widePath) {
     TagLib::MP4::File file(widePath.c_str());
     if (!file.isValid() || !file.tag()) return {};
 
@@ -412,7 +247,7 @@ static std::vector<unsigned char> ExtractFromM4A(const std::wstring& widePath) {
 }
 
 
-static std::string ExtractLyricsFromFLAC(const std::wstring& widePath) {
+static std::string ExtractLyricsFromFLAC(const PathType& widePath) {
     TagLib::FLAC::File file(widePath.c_str());
     if (!file.isValid()) return "";
 
@@ -432,11 +267,11 @@ static std::string ExtractLyricsFromFLAC(const std::wstring& widePath) {
     return "";
 }
 
-std::string GetLyricsFromFile(const std::wstring& widePath) {
-    std::wstring ext = GetExtension(widePath);
+std::string GetLyricsFromFile(const PathType& widePath) {
+    std::string ext = GetExtension(widePath);
 
     // FLAC 走 Xiph 注释路径
-    if (ext == L"flac") {
+    if (ext == "flac") {
         return ExtractLyricsFromFLAC(widePath);
     }
 
@@ -469,24 +304,29 @@ std::string GetLyricsFromFile(const std::wstring& widePath) {
     }
     return "";
 }
-std::wstring FindLrcFile(const std::wstring& musicFilePath) {
+PathType FindLrcFile(const PathType& musicFilePath) {
     namespace fs = std::filesystem;
     fs::path musicPath(musicFilePath);
     fs::path musicDir = musicPath.parent_path();
-    std::wstring baseName = musicPath.stem().wstring();  // 不带扩展名的文件名
+    fs::path baseName = musicPath.stem();
 
-    // 1. 检查同目录下是否存在 .lrc 或 .LRC
-    for (const auto& ext : { L".lrc", L".LRC" }) {
-        fs::path lrcPath = musicDir / (baseName + ext);
+    // 1. 同目录下找 .lrc / .LRC
+    for (const char* ext : { ".lrc", ".LRC" }) {
+        fs::path lrcPath = musicDir / baseName;
+        lrcPath += ext;
         if (fs::exists(lrcPath)) {
-            return lrcPath.wstring();
+            return lrcPath.native();   // fs::path → PathType（平台原生类型）
         }
     }
 
-    // 2. 常见的歌词文件夹名称（大小写、中文）
-    std::vector<std::wstring> lyricFolderNames = {
-        L"lyrics", L"Lyrics", L"LYRICS",
-        L"歌词", L"LYRIC", L"Lyric"
+    // 2. 常见的歌词文件夹名（UTF-8 字面量，两平台通用）
+    const std::vector<fs::path> lyricFolderNames = {
+        fs::path("lyrics"),
+        fs::path("Lyrics"),
+        fs::path("LYRICS"),
+        fs::path("歌词"),
+        fs::path("LYRIC"),
+        fs::path("Lyric"),
     };
 
     for (const auto& folderName : lyricFolderNames) {
@@ -494,26 +334,30 @@ std::wstring FindLrcFile(const std::wstring& musicFilePath) {
         if (!fs::exists(lyricDir) || !fs::is_directory(lyricDir)) {
             continue;
         }
-        // 遍历该目录下的所有文件
+
         for (const auto& entry : fs::directory_iterator(lyricDir)) {
-            if (entry.is_regular_file()) {
-                std::wstring ext = entry.path().extension().wstring();
-                if (ext == L".lrc" || ext == L".LRC") {
-                    std::wstring entryBase = entry.path().stem().wstring();
-                    if (entryBase == baseName) {
-                        return entry.path().wstring();
-                    }
-                }
+            if (!entry.is_regular_file()) continue;
+
+            // 扩展名比较（小写）
+            std::string ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                [](unsigned char c) { return (char)std::tolower(c); });
+            if (ext != ".lrc") continue;
+
+            // 主文件名比较
+            if (entry.path().stem() == baseName) {
+                return entry.path().native();
             }
         }
     }
-    return L"";
+
+    return {};   // 空 PathType
 }
 // ---------- 统一入口 ----------
-std::vector<unsigned char> ExtractAlbumArt(const std::wstring& filePath) {
-    std::wstring ext = GetExtension(filePath);
-    if (ext == L"mp3")   return ExtractFromMP3(filePath);
-    if (ext == L"flac")  return ExtractFromFLAC(filePath);
-    if (ext == L"m4a" || ext == L"aac") return ExtractFromM4A(filePath);
+std::vector<unsigned char> ExtractAlbumArt(const PathType& filePath) {
+    std::string ext = GetExtension(filePath);
+    if (ext == "mp3")   return ExtractFromMP3(filePath);
+    if (ext == "flac")  return ExtractFromFLAC(filePath);
+    if (ext == "m4a" || ext == "aac") return ExtractFromM4A(filePath);
     return {};
 }

@@ -1,9 +1,7 @@
 #include "SettingItem.h"
 #include "manageconfig.h"
 #include <string>
-#include <windows.h>
 
-extern HANDLE g_hMutex;
 
 
 // 全局配置变量（实际应放在配置管理类中）
@@ -155,24 +153,8 @@ void SettingWindow::render() {
             for (auto& item : catAll.items) item->save();
         }
         ManageConfig::GetInstance().Save();
-
-        // 关闭互斥体，释放锁（让新进程可以创建自己的互斥体）
-        if (g_hMutex) {
-            CloseHandle(g_hMutex);
-            g_hMutex = NULL;
-        }
-
-        // 启动新进程（使用当前命令行）
-        LPWSTR cmdLine = GetCommandLineW();
-        std::wstring cmd(cmdLine);
-        STARTUPINFOW si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
-        PROCESS_INFORMATION pi; ZeroMemory(&pi, sizeof(pi));
-        if (CreateProcessW(NULL, &cmd[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-            CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-        }
-        // 无论启动是否成功，当前进程退出
-        ExitProcess(0);
+        SaveAndRestart();  
+        
     }
 
 
