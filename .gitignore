@@ -22,9 +22,6 @@ config.json
 *.bak
 *.vs
 
-.vscode/
-.vscode/*
-
 imgui.ini
 enc_temp_folder/
 enc_temp_folder/*
@@ -37,8 +34,23 @@ CMakeSettings.json
 # 忽略 Windows 系统生成的临时文件
 Thumbs.db
 Desktop.ini
+trumbs.db
+desktop.ini
 
 # 其他可能的敏感文件或目录
 *.log
 *.tmp
 secrets.json
+
+out/
+out/*
+Vacuum_Music_Player/build-deb/
+Vacuum_Music_Player/build-release/
+
+*.a
+*.so
+
+build-deb/*
+/Vacuum_Music_Player_CMAKE/build-deb
+/Vacuum_Music_Player/main -1004 (bug).cpp
+/Vacuum_Music_Player/main.bak.cpp

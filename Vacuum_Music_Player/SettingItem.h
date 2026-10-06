@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include <imgui.h>
+#include <imgui/imgui.h>
 #include <memory>
 #include <sstream>
 #include <type_traits>
@@ -12,7 +12,6 @@
 
 
 // forward declare PickFolderDialog (avoid including .cpp). Do not repeat default parameter here.
-std::string PickFolderDialog(WindowHandle hwndOwner);
 #include <typeinfo>
 
 

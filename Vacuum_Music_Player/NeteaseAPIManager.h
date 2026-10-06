@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include <platform/platform.h>
 
 struct NeteaseSongInfo {
     std::string id;

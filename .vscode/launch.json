@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/home/tomwu/code/Vacuum_Music_Player/out/build/linux-debug/bin/Vacuum_Music_Player_CMAKE",
+            "args": [],
+            "preLaunchTask": "CMake Build", 
+            "stopAtEntry": false,
+            "cwd": "/home/tomwu/code/Vacuum_Music_Player/out/build/linux-debug",
+            "environment": [
+                { "name": "DISPLAY", "value": ":0" }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Ignore SIGPIPE",
+                    "text": "handle SIGPIPE nostop noprint pass",
+                    "ignoreFailures": true
+                },
+                { "description": "pretty-print", "text": "-enable-pretty-printing", "ignoreFailures": true }
+            ]
+        }
+    ]
+}

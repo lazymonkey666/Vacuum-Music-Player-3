@@ -132,23 +132,40 @@ namespace {
 
     std::vector<SonosDevice> DiscoverSonosDevices(const std::string& localIP, int timeoutSec) {
         std::vector<SonosDevice> devices;
+    
+        OutputDebugStringA(("\n[ssdp] ========== DiscoverSonosDevices start ==========\n"));
+        OutputDebugStringA(("[ssdp] localIP=" + localIP +
+                            " timeout=" + std::to_string(timeoutSec) + "s\n").c_str());
+    
         SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (sock == INVALID_SOCKET) return devices;
-
+        if (sock == INVALID_SOCKET) {
+            OutputDebugStringA("[ssdp] socket() failed\n");
+            return devices;
+        }
+        OutputDebugStringA(("[ssdp] socket created, fd=" + std::to_string(sock) + "\n").c_str());
+    
         int reuse = 1;
         setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
         int ttl = 4;
         setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (const char*)&ttl, sizeof(ttl));
-
+    
         sockaddr_in local = {};
         local.sin_family = AF_INET;
         local.sin_port = htons(0);
-        inet_pton(AF_INET, localIP.c_str(), &local.sin_addr);
-        if (bind(sock, (sockaddr*)&local, sizeof(local)) == SOCKET_ERROR) {
+        if (inet_pton(AF_INET, localIP.c_str(), &local.sin_addr) != 1) {
+            OutputDebugStringA(("[ssdp] inet_pton failed for localIP: " + localIP + "\n").c_str());
             closesocket(sock);
             return devices;
         }
-
+    
+        if (bind(sock, (sockaddr*)&local, sizeof(local)) == SOCKET_ERROR) {
+            OutputDebugStringA(("[ssdp] bind() failed to " + localIP + ":0, errno=" +
+                                std::to_string(errno) + "\n").c_str());
+            closesocket(sock);
+            return devices;
+        }
+        OutputDebugStringA(("[ssdp] bound to " + localIP + ":0\n").c_str());
+    
         const char* query =
             "M-SEARCH * HTTP/1.1\r\n"
             "HOST: 239.255.255.250:1900\r\n"
@@ -156,137 +173,177 @@ namespace {
             "MX: 2\r\n"
             "ST: urn:schemas-upnp-org:device:ZonePlayer:1\r\n"
             "\r\n";
-
+    
         sockaddr_in dest = {};
         dest.sin_family = AF_INET;
         dest.sin_port = htons(1900);
         inet_pton(AF_INET, "239.255.255.250", &dest.sin_addr);
-
-        if (sendto(sock, query, (int)strlen(query), 0, (sockaddr*)&dest, sizeof(dest)) == SOCKET_ERROR) {
+    
+        int sent = sendto(sock, query, (int)strlen(query), 0, (sockaddr*)&dest, sizeof(dest));
+        if (sent == SOCKET_ERROR) {
+            OutputDebugStringA(("[ssdp] sendto failed, errno=" +
+                                std::to_string(errno) + "\n").c_str());
             closesocket(sock);
             return devices;
         }
-
+        OutputDebugStringA(("[ssdp] M-SEARCH sent (" + std::to_string(sent) + " bytes) to 239.255.255.250:1900\n").c_str());
+    
         fd_set readfds;
         timeval tv = { timeoutSec, 0 };
         char buf[4096];
-
+        int responseCount = 0;
+        int iteration = 0;
+    
         while (true) {
+            iteration++;
             FD_ZERO(&readfds);
             FD_SET(sock, &readfds);
-            if (select(0, &readfds, nullptr, nullptr, &tv) <= 0)
+    
+            // ★ 关键修复：Linux 上 select 需要 max_fd + 1
+            int sel = select(sock + 1, &readfds, nullptr, nullptr, &tv);
+            if (sel <= 0) {
+                OutputDebugStringA(("[ssdp] select timeout after " +
+                                    std::to_string(iteration) + " iterations (got " +
+                                    std::to_string(responseCount) + " responses)\n").c_str());
                 break;
-
+            }
+            OutputDebugStringA(("[ssdp] select ready, iteration=" +
+                                std::to_string(iteration) + "\n").c_str());
+    
             sockaddr_in from;
-            int fromLen = sizeof(from);
+            socklen_t fromLen = sizeof(from);
             int n = recvfrom(sock, buf, sizeof(buf) - 1, 0, (sockaddr*)&from, &fromLen);
-            if (n <= 0) break;
+            if (n <= 0) {
+                OutputDebugStringA(("[ssdp] recvfrom failed, errno=" +
+                                    std::to_string(errno) + "\n").c_str());
+                break;
+            }
             buf[n] = '\0';
             std::string response(buf);
-
+    
+            char fromIpStr[INET_ADDRSTRLEN] = {0};
+            inet_ntop(AF_INET, &from.sin_addr, fromIpStr, sizeof(fromIpStr));
+            responseCount++;
+            OutputDebugStringA(("[ssdp] response #" + std::to_string(responseCount) +
+                                " from " + fromIpStr + " (" +
+                                std::to_string(n) + " bytes)\n").c_str());
+    
+            // 打印响应前 200 字节（直观判断内容格式）
+            std::string preview = response.substr(0, std::min<size_t>(200, response.size()));
+            for (auto& c : preview) if (c == '\r' || c == '\n') c = ' ';
+            OutputDebugStringA(("[ssdp]   preview: " + preview + "\n").c_str());
+    
             auto findHeader = [&](const std::string& header) -> std::string {
                 size_t pos = response.find(header + ": ");
                 if (pos == std::string::npos) return "";
                 pos += header.size() + 2;
                 size_t end = response.find("\r\n", pos);
                 return response.substr(pos, end - pos);
-                };
-
+            };
+    
             std::string location = findHeader("LOCATION");
+            OutputDebugStringA(("[ssdp]   LOCATION = " + (location.empty() ? "(empty)" : location) + "\n").c_str());
+    
             if (!location.empty()) {
                 bool exists = false;
                 for (auto& d : devices) if (d.location == location) { exists = true; break; }
-                if (!exists) {
-                    SonosDevice dev;
-                    dev.location = location;
-                    dev.server = findHeader("SERVER");
-                    char ipStr[INET_ADDRSTRLEN];
-                    inet_ntop(AF_INET, &from.sin_addr, ipStr, sizeof(ipStr));
-                    dev.ip = ipStr;
-                    std::string host, path;
-                    size_t proto_pos = location.find("://");
-                    if (proto_pos != std::string::npos) {
-                        size_t host_start = proto_pos + 3;
-                        size_t host_end = location.find('/', host_start);
-                        if (host_end == std::string::npos) host_end = location.size();
-                        host = location.substr(host_start, host_end - host_start);
-                        if (host_end < location.size())
-                            path = location.substr(host_end);
-                        else
-                            path = "/";
-                    }
-
-                    // 分割 host 和 port
-                    std::string hostname = host;
-                    int port = 80;
-                    size_t colon = host.find(':');
-                    if (colon != std::string::npos) {
-                        hostname = host.substr(0, colon);
-                        port = std::stoi(host.substr(colon + 1));
-                    }
-
-                    // 使用 httplib 发起 GET 请求
-                    httplib::Client cli(hostname, port);
-                    cli.set_connection_timeout(2);   // 2 秒连接超时
-                    cli.set_read_timeout(2);          // 2 秒读取超时
-                    auto res = cli.Get(path.c_str());
-                    if (res && res->status == 200) {
-                        const std::string& body = res->body;
-                        // 提取 MediaRenderer 设备的 friendlyName 中的房间名部分
-                        std::string roomName;
-                        const std::string mediaRendererType = "<deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>";
-                        size_t typePos = body.find(mediaRendererType);
-                        if (typePos != std::string::npos) {
-                            size_t deviceStart = body.rfind("<device", typePos);
-                            if (deviceStart != std::string::npos) {
-                                size_t friendlyStart = body.find("<friendlyName>", deviceStart);
-                                if (friendlyStart != std::string::npos) {
-                                    friendlyStart += 13;
-                                    size_t friendlyEnd = body.find("</friendlyName>", friendlyStart);
-                                    if (friendlyEnd != std::string::npos) {
-                                        std::string fullName = body.substr(friendlyStart+1, friendlyEnd - friendlyStart);
-                                        // 提取第一个 " - " 之前的部分作为房间名
-                                        size_t dash = fullName.find(" - ");
-                                        if (dash != std::string::npos)
-                                            roomName = fullName.substr(0, dash);
-                                        else
-                                            roomName = fullName; // 没有分隔符则用完整名称
-                                    }
-                                }
-                            }
-                        }
-                        if (roomName.empty()) {
-                            // 后备：根设备的 friendlyName
-                            const std::string tagOpen = "<friendlyName>";
-                            const std::string tagClose = "</friendlyName>";
-                            size_t start = body.find(tagOpen);
-                            if (start != std::string::npos) {
-                                start += tagOpen.size();
-                                size_t end = body.find(tagClose, start);
-                                if (end != std::string::npos) {
-                                    std::string rootName = body.substr(start, end - start);
-                                    size_t dash = rootName.find(" - ");
-                                    if (dash != std::string::npos)
-                                        roomName = rootName.substr(0, dash);
-                                    else
-                                        roomName = rootName;
-                                }
-                            }
-                        }
-                        if (!roomName.empty())
-                            dev.friendlyName = roomName + " - " + dev.ip;   // 显示为 "客厅 - 192.168.3.51"
-                        else
-                            dev.friendlyName = dev.ip;
-                    }
-                    else {
-                        dev.friendlyName = dev.ip;
-                    }
-                    devices.push_back(dev);
+                if (exists) {
+                    OutputDebugStringA("[ssdp]   duplicate, skipped\n");
+                    continue;
                 }
+    
+                SonosDevice dev;
+                dev.location = location;
+                dev.server = findHeader("SERVER");
+                dev.ip = fromIpStr;
+    
+                std::string host, path;
+                size_t proto_pos = location.find("://");
+                if (proto_pos != std::string::npos) {
+                    size_t host_start = proto_pos + 3;
+                    size_t host_end = location.find('/', host_start);
+                    if (host_end == std::string::npos) host_end = location.size();
+                    host = location.substr(host_start, host_end - host_start);
+                    path = (host_end < location.size()) ? location.substr(host_end) : "/";
+                }
+    
+                std::string hostname = host;
+                int port = 80;
+                size_t colon = host.find(':');
+                if (colon != std::string::npos) {
+                    hostname = host.substr(0, colon);
+                    port = std::stoi(host.substr(colon + 1));
+                }
+    
+                OutputDebugStringA(("[ssdp]   fetching device description: http://" +
+                                    hostname + ":" + std::to_string(port) + path + "\n").c_str());
+    
+                httplib::Client cli(hostname, port);
+                cli.set_connection_timeout(2);
+                cli.set_read_timeout(2);
+                auto res = cli.Get(path.c_str());
+    
+                if (res && res->status == 200) {
+                    OutputDebugStringA(("[ssdp]   GET OK, body size=" +
+                                        std::to_string(res->body.size()) + "\n").c_str());
+    
+                    const std::string& body = res->body;
+                    std::string roomName;
+                    const std::string mediaRendererType =
+                        "<deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>";
+                    size_t typePos = body.find(mediaRendererType);
+                    if (typePos != std::string::npos) {
+                        size_t deviceStart = body.rfind("<device", typePos);
+                        if (deviceStart != std::string::npos) {
+                            size_t friendlyStart = body.find("<friendlyName>", deviceStart);
+                            if (friendlyStart != std::string::npos) {
+                                friendlyStart += 13;
+                                size_t friendlyEnd = body.find("</friendlyName>", friendlyStart);
+                                if (friendlyEnd != std::string::npos) {
+                                    std::string fullName = body.substr(friendlyStart + 1, friendlyEnd - friendlyStart);
+                                    size_t dash = fullName.find(" - ");
+                                    roomName = (dash != std::string::npos) ? fullName.substr(0, dash) : fullName;
+                                }
+                            }
+                        }
+                    }
+                    if (roomName.empty()) {
+                        const std::string tagOpen = "<friendlyName>";
+                        const std::string tagClose = "</friendlyName>";
+                        size_t start = body.find(tagOpen);
+                        if (start != std::string::npos) {
+                            start += tagOpen.size();
+                            size_t end = body.find(tagClose, start);
+                            if (end != std::string::npos) {
+                                std::string rootName = body.substr(start, end - start);
+                                size_t dash = rootName.find(" - ");
+                                roomName = (dash != std::string::npos) ? rootName.substr(0, dash) : rootName;
+                            }
+                        }
+                    }
+    
+                    if (!roomName.empty()) {
+                        dev.friendlyName = roomName + " - " + dev.ip;
+                        OutputDebugStringA(("[ssdp]   device added: " + dev.friendlyName + "\n").c_str());
+                    } else {
+                        dev.friendlyName = dev.ip;
+                        OutputDebugStringA(("[ssdp]   device added (no room name): " + dev.ip + "\n").c_str());
+                    }
+                } else {
+                    OutputDebugStringA(("[ssdp]   GET failed, status=" +
+                                        std::to_string(res ? res->status : -1) + "\n").c_str());
+                    dev.friendlyName = dev.ip;
+                }
+                devices.push_back(dev);
+            } else {
+                OutputDebugStringA("[ssdp]   no LOCATION header, skipped\n");
             }
         }
-
+    
         closesocket(sock);
+    
+        OutputDebugStringA(("[ssdp] ========== DiscoverSonosDevices end, " +
+                            std::to_string(devices.size()) + " device(s) ==========\n\n").c_str());
         return devices;
     }
 }
@@ -327,7 +384,7 @@ struct SonosController::Impl {
         sonosSystem.reset();
         connected = false;
         if (initialized) {
-            WSACleanup();
+            CleanupNetwork();
             initialized = false;
         }
     }
@@ -341,41 +398,44 @@ struct SonosController::Impl {
         }
     }
     std::string GetLocalIP() {
-        char hostname[256];
-        gethostname(hostname, sizeof(hostname));
-        struct addrinfo hints = {}, * info;
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        if (getaddrinfo(hostname, NULL, &hints, &info) != 0)
-            return "127.0.0.1";
-
-        char ipStr[INET_ADDRSTRLEN] = { 0 };
-        if (info && info->ai_family == AF_INET) {
-            sockaddr_in* addr = (sockaddr_in*)info->ai_addr;
-            inet_ntop(AF_INET, &addr->sin_addr, ipStr, INET_ADDRSTRLEN);
-        }
-        freeaddrinfo(info);
-
-        std::string ip = ipStr;
-        if (ip == "127.0.0.1") {
-            // fallback: 使用 UDP socket 获取出口 IP
+        // 1. 先直接试路由法：连一个外部地址，看内核选哪张网卡出去
+        {
             SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-            sockaddr_in dst = {};
-            dst.sin_family = AF_INET;
-            dst.sin_port = htons(53);
-            inet_pton(AF_INET, "8.8.8.8", &dst.sin_addr);
-            if (connect(s, (sockaddr*)&dst, sizeof(dst)) == 0) {
-                sockaddr_in local;
-                int len = sizeof(local);
-                getsockname(s, (sockaddr*)&local, &len);
-                inet_ntop(AF_INET, &local.sin_addr, ipStr, INET_ADDRSTRLEN);
-                ip = ipStr;   // 直接赋值，长度自动正确
+            if (s != INVALID_SOCKET) {
+                sockaddr_in dst = {};
+                dst.sin_family = AF_INET;
+                dst.sin_port = htons(53);
+                inet_pton(AF_INET, "8.8.8.8", &dst.sin_addr);
+                if (connect(s, (sockaddr*)&dst, sizeof(dst)) == 0) {
+                    sockaddr_in local;
+                    socklen_t len = sizeof(local);
+                    if (getsockname(s, (sockaddr*)&local, &len) == 0) {
+                        char ipStr[INET_ADDRSTRLEN] = {0};
+                        inet_ntop(AF_INET, &local.sin_addr, ipStr, sizeof(ipStr));
+                        std::string ip = ipStr;
+                        closesocket(s);
+                        // 非空、非 127.x 就是有效出口 IP
+                        if (!ip.empty() && ip.rfind("127.", 0) != 0) {
+                            OutputDebugStringA(("[net] localIP (route) = " + ip + "\n").c_str());
+                            return ip;
+                        }
+                    }
+                }
+                closesocket(s);
             }
-            closesocket(s);
         }
-
-        // 确保丢掉多余的空字符（其实 ipStr 复制进来时自动截断了）
-        return ip.c_str();   // 或者直接 return ip;
+    
+        // 2. fallback：扫网卡，取第一个非环回 IPv4
+        for (const auto& adp : EnumNetworkAdapters()) {
+            if (!adp.ip.empty() && adp.ip.rfind("127.", 0) != 0) {
+                OutputDebugStringA(("[net] localIP (adapter) = " + adp.ip + "\n").c_str());
+                return adp.ip;
+            }
+        }
+    
+        // 3. 实在没有
+        OutputDebugStringA("[net] localIP fallback to 127.0.0.1\n");
+        return "127.0.0.1";
     }
     bool StartHttpServer(const PathType& musicFolder, int port) {
         // 1. 检查文件夹
@@ -407,14 +467,37 @@ struct SonosController::Impl {
         httpRunning = true;
         httpThread = std::thread([this, utf8Path, port]() {
             httplib::Server svr;
+        
+            // ★ 唯一新增
+            svr.set_exception_handler([](const httplib::Request& req,
+                                         httplib::Response& res,
+                                         std::exception_ptr ep) {
+                std::string msg;
+                try { std::rethrow_exception(ep); }
+                catch (const std::exception& e) { msg = e.what(); }
+                catch (...) { msg = "unknown"; }
+                OutputDebugStringA(("[httplib] exception on " + req.method + " " +
+                                    req.path + ": " + msg + "\n").c_str());
+                res.status = 500;
+                res.set_content("", "text/plain");
+            });
+        
+            // ★ 可选，能看 4xx/5xx
+            svr.set_error_handler([](const httplib::Request& req,
+                                     httplib::Response& res) {
+                OutputDebugStringA(("[httplib] error " + std::to_string(res.status) +
+                                    " on " + req.method + " " + req.path + "\n").c_str());
+            });
+        
             svr.set_mount_point("/", utf8Path.c_str());
+        
             httpServer = &svr;
             if (!svr.listen("0.0.0.0", port)) {
-                OutputDebugStringA("[StartHttpServer] FAIL: listen failed");
+                OutputDebugStringA("[StartHttpServer] FAIL: listen failed\n");
             }
             httpServer = nullptr;
             httpRunning = false;
-            });
+        });
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         OutputDebugStringA(("[StartHttpServer] SUCCESS, port=" + std::to_string(port) + "\n").c_str());
         return httpRunning;
@@ -523,8 +606,7 @@ SonosController::~SonosController() = default;
 
 bool SonosController::Initialize() {
     if (pImpl->initialized) return true;
-    WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
+    if (!InitNetwork()) return false;
     pImpl->initialized = true;
     return true;
 }

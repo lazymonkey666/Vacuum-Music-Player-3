@@ -20,11 +20,11 @@
 #include <vector>
 #include <filesystem>
 
-// Ô¤¼ÆËã¸ßË¹È¨ÖØ±í£¨ÓÉÓÚ°ë¾¶Ëæ x ±ä»¯£¬×î¶à 81 ÖÖ°ë¾¶£©
+// Ô¤ï¿½ï¿½ï¿½ï¿½ï¿½Ë¹È¨ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú°ë¾¶ï¿½ï¿½ x ï¿½ä»¯ï¿½ï¿½ï¿½ï¿½ï¿½ 81 ï¿½Ö°ë¾¶ï¿½ï¿½
 static std::vector<float> ComputeGaussianWeights(float radius) {
     if (radius < 1.0f) return { 1.0f };
     float sigma = radius / 3.0f;
-    int kernelSize = (int)(sigma * 6) + 1;  // ¸²¸Ç 6¦Ò
+    int kernelSize = (int)(sigma * 6) + 1;  // ï¿½ï¿½ï¿½ï¿½ 6ï¿½ï¿½
     int half = kernelSize / 2;
     std::vector<float> weights(kernelSize);
     float sum = 0.0f;
@@ -38,15 +38,15 @@ static std::vector<float> ComputeGaussianWeights(float radius) {
     return weights;
 }
 
-// ·½ÏòÐÔ±ä°ë¾¶Ä£ºý£¨direction: 0=Ë®Æ½, 1=´¹Ö±£©
+// ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ë¾¶Ä£ï¿½ï¿½ï¿½ï¿½direction: 0=Ë®Æ½, 1=ï¿½ï¿½Ö±ï¿½ï¿½
 static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int width, int height, bool vertical) {
     std::vector<unsigned char> result(pixels.size());
     const float maxRadius = 80.0f;
-    const float fadeEnd = width * 0.55f;  // 172.5 ÏñËØ
+    const float fadeEnd = width * 0.55f;  // 172.5 ï¿½ï¿½ï¿½ï¿½
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            // ¼ÆËãµ±Ç°ÏñËØµÄÄ£ºý°ë¾¶£¨»ùÓÚ x ×ø±ê£©
+            // ï¿½ï¿½ï¿½ãµ±Ç°ï¿½ï¿½ï¿½Øµï¿½Ä£ï¿½ï¿½ï¿½ë¾¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ x ï¿½ï¿½ï¿½ê£©
             float r = 0.0f;
             if (x <= fadeEnd) {
                 r = maxRadius * (1.0f - (float)x / fadeEnd);
@@ -57,7 +57,7 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
             }
 
             if (r < 1.0f) {
-                // ÎÞÐèÄ£ºý£¬Ö±½Ó¸´ÖÆÔ­ÏñËØ
+                // ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½Ö±ï¿½Ó¸ï¿½ï¿½ï¿½Ô­ï¿½ï¿½ï¿½ï¿½
                 int idx = (y * width + x) * 4;
                 result[idx] = pixels[idx];
                 result[idx + 1] = pixels[idx + 1];
@@ -66,7 +66,7 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
                 continue;
             }
 
-            // »ñÈ¡¸Ã°ë¾¶µÄ¸ßË¹È¨ÖØ±í
+            // ï¿½ï¿½È¡ï¿½Ã°ë¾¶ï¿½Ä¸ï¿½Ë¹È¨ï¿½Ø±ï¿½
             auto weights = ComputeGaussianWeights(r);
             int kernelSize = (int)weights.size();
             int half = kernelSize / 2;
@@ -75,7 +75,7 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
             float totalWeight = 0.0f;
 
             if (!vertical) {
-                // Ë®Æ½Ä£ºý
+                // Ë®Æ½Ä£ï¿½ï¿½
                 int startX = (std::max)(0, x - half);
                 int endX = (std::min)(width - 1, x + half);
                 for (int sx = startX; sx <= endX; ++sx) {
@@ -91,7 +91,7 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
                 }
             }
             else {
-                // ´¹Ö±Ä£ºý
+                // ï¿½ï¿½Ö±Ä£ï¿½ï¿½
                 int startY = ((std::max))(0, y - half);
                 int endY = (std::min)(height - 1, y + half);
                 for (int sy = startY; sy <= endY; ++sy) {
@@ -115,7 +115,7 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
                 result[outIdx + 3] = (unsigned char)(sumA / totalWeight);
             }
             else {
-                // »ØÍË
+                // ï¿½ï¿½ï¿½ï¿½
                 int idx = (y * width + x) * 4;
                 result[idx] = pixels[idx];
                 result[idx + 1] = pixels[idx + 1];
@@ -128,18 +128,27 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
 }
 
 
-// ÐÂÔöº¯Êý£ºÓ¦ÓÃ½¥±äÍ¸Ã÷Ð§¹û
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½Ã½ï¿½ï¿½ï¿½Í¸ï¿½ï¿½Ð§ï¿½ï¿½
 std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigned char>& imageData, int targetWidth, int targetHeight) {
-    // 1. ½âÂë²¢Ëõ·ÅÖÁÄ¿±ê³ß´ç
+    OutputDebugStringA(("[PAWG] entry, input=" + std::to_string(imageData.size()) + "\n").c_str());
+
     std::vector<unsigned char> pixelData = DecodeAndScaleImage(imageData, targetWidth, targetHeight);
-    if (pixelData.empty()) return {};
+    if (pixelData.empty()) {
+        OutputDebugStringA("[PAWG] DecodeAndScaleImage FAILED\n");
+        return {};
+    }
+    OutputDebugStringA(("[PAWG] decode OK, size=" + std::to_string(pixelData.size()) + "\n").c_str());
+
+    VariableDirectionalBlur(pixelData, targetWidth, targetHeight, false);
+    VariableDirectionalBlur(pixelData, targetWidth, targetHeight, true);
+    OutputDebugStringA("[PAWG] blur OK\n");
 
     VariableDirectionalBlur(pixelData, targetWidth, targetHeight, false);
     VariableDirectionalBlur(pixelData, targetWidth, targetHeight, true);
 
-    // 3. Ó¦ÓÃ alpha ½¥±äÍ¸Ã÷£¬Ê¹ÓÃ smoothstep ÇúÏß£¬²¢Ôö¼ÓÒ»¸öÆðÊ¼Æ«ÒÆ£¨Ç° 10% ÍêÈ«Í¸Ã÷£©
-    const float startFade = 0.05f;    // Ç° 5% ¿í¶ÈÍêÈ«Í¸Ã÷
-    const float endFade = 0.75f;      // 75% ´¦ÍêÈ«²»Í¸Ã÷
+    // 3. Ó¦ï¿½ï¿½ alpha ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ smoothstep ï¿½ï¿½ï¿½ß£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ê¼Æ«ï¿½Æ£ï¿½Ç° 10% ï¿½ï¿½È«Í¸ï¿½ï¿½ï¿½ï¿½
+    const float startFade = 0.05f;    // Ç° 5% ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È«Í¸ï¿½ï¿½
+    const float endFade = 0.75f;      // 75% ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½Í¸ï¿½ï¿½
     for (int y = 0; y < targetHeight; ++y) {
         for (int x = 0; x < targetWidth; ++x) {
             size_t idx = (y * targetWidth + x) * 4 + 3;
@@ -152,7 +161,7 @@ std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigne
                 alpha = 255.0f;
             }
             else {
-                // ÔÚ [startFade, endFade] Ö®¼äÆ½»¬²åÖµ£¬Ê¹ÓÃ smoothstep
+                // ï¿½ï¿½ [startFade, endFade] Ö®ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½Ê¹ï¿½ï¿½ smoothstep
                 float s = (t - startFade) / (endFade - startFade);
                 // smoothstep: 3*s^2 - 2*s^3
                 float smooth = s * s * (3.0f - 2.0f * s);
@@ -162,15 +171,15 @@ std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigne
         }
     }
 
+    OutputDebugStringA("[PAWG] done\n");
     return pixelData;
 }
 
-
-// »ñÈ¡À©Õ¹Ãû£¨Ð¡Ð´£©
+// ï¿½ï¿½È¡ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½Ð¡Ð´ï¿½ï¿½
 static std::string GetExtension(const PathType& path) {
     std::string ext = std::filesystem::path(path).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-    if (!ext.empty() && ext[0] == '.') ext.erase(0, 1);   // ¡û È¥µôÇ°µ¼µã
+    if (!ext.empty() && ext[0] == '.') ext.erase(0, 1);   // ï¿½ï¿½ È¥ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½
     return ext;
 }
 
@@ -183,7 +192,7 @@ static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
     auto frames = tag->frameListMap()["APIC"];
     if (frames.isEmpty()) return {};
 
-    // ÓÅÏÈÈ¡ FrontCover£¬·ñÔòÈ¡µÚÒ»¸ö APIC Ö¡
+    // ï¿½ï¿½ï¿½ï¿½È¡ FrontCoverï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½ APIC Ö¡
     for (auto* frame : frames) {
         auto* pic = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame*>(frame);
         if (pic && pic->type() == TagLib::ID3v2::AttachedPictureFrame::FrontCover) {
@@ -191,7 +200,7 @@ static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
             return std::vector<unsigned char>(data.begin(), data.end());
         }
     }
-    // Èç¹ûÃ»ÓÐ FrontCover£¬·µ»ØµÚÒ»¸ö APIC Ö¡
+    // ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ FrontCoverï¿½ï¿½ï¿½ï¿½ï¿½Øµï¿½Ò»ï¿½ï¿½ APIC Ö¡
     if (!frames.isEmpty()) {
         auto* firstPic = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame*>(frames.front());
         if (firstPic) {
@@ -210,14 +219,14 @@ static std::vector<unsigned char> ExtractFromFLAC(const PathType& widePath) {
     auto pictures = file.pictureList();
     if (pictures.isEmpty()) return {};
 
-    // ÓÅÏÈÈ¡ FrontCover
+    // ï¿½ï¿½ï¿½ï¿½È¡ FrontCover
     for (auto* pic : pictures) {
         if (pic->type() == TagLib::FLAC::Picture::FrontCover) {
             TagLib::ByteVector data = pic->data();
             return std::vector<unsigned char>(data.begin(), data.end());
         }
     }
-    // ·ñÔòÈ¡µÚÒ»ÕÅ
+    // ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½
     TagLib::ByteVector data = pictures[0]->data();
     return std::vector<unsigned char>(data.begin(), data.end());
 }
@@ -254,12 +263,12 @@ static std::string ExtractLyricsFromFLAC(const PathType& widePath) {
     TagLib::Ogg::XiphComment* xiph = file.xiphComment();
     if (!xiph) return "";
 
-    // Vorbis×¢ÊÍÖÐ¸è´ÊÍ¨³£´æ´¢ÔÚ "LYRICS" ×Ö¶Î
+    // Vorbis×¢ï¿½ï¿½ï¿½Ð¸ï¿½ï¿½Í¨ï¿½ï¿½ï¿½æ´¢ï¿½ï¿½ "LYRICS" ï¿½Ö¶ï¿½
     auto lyricsList = xiph->fieldListMap()["LYRICS"];
     if (!lyricsList.isEmpty()) {
         return lyricsList.front().to8Bit(true);
     }
-    // ±¸Ñ¡£ºÓÐÐ©Èí¼þÒ²ÓÃ "UNSYNCEDLYRICS"
+    // ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½Ð©ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ï¿½ "UNSYNCEDLYRICS"
     lyricsList = xiph->fieldListMap()["UNSYNCEDLYRICS"];
     if (!lyricsList.isEmpty()) {
         return lyricsList.front().to8Bit(true);
@@ -270,12 +279,12 @@ static std::string ExtractLyricsFromFLAC(const PathType& widePath) {
 std::string GetLyricsFromFile(const PathType& widePath) {
     std::string ext = GetExtension(widePath);
 
-    // FLAC ×ß Xiph ×¢ÊÍÂ·¾¶
+    // FLAC ï¿½ï¿½ Xiph ×¢ï¿½ï¿½Â·ï¿½ï¿½
     if (ext == "flac") {
         return ExtractLyricsFromFLAC(widePath);
     }
 
-    // MP3 / ÆäËû¿ÉÄÜ´øID3v2µÄ¸ñÊ½
+    // MP3 / ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü´ï¿½ID3v2ï¿½Ä¸ï¿½Ê½
     TagLib::FileRef f(widePath.c_str());
     if (f.isNull() || !f.tag()) return "";
 
@@ -285,7 +294,7 @@ std::string GetLyricsFromFile(const PathType& widePath) {
         id3v2tag = mpegFile->ID3v2Tag();
     }
     else {
-        // ²¿·Ö FLAC Ç¶Èë ID3v2 µÄÇé¿ö£¨¿ÉÑ¡±£Áô£©
+        // ï¿½ï¿½ï¿½ï¿½ FLAC Ç¶ï¿½ï¿½ ID3v2 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         TagLib::FLAC::File* flacFile = dynamic_cast<TagLib::FLAC::File*>(f.file());
         if (flacFile) {
             id3v2tag = flacFile->ID3v2Tag();
@@ -310,21 +319,21 @@ PathType FindLrcFile(const PathType& musicFilePath) {
     fs::path musicDir = musicPath.parent_path();
     fs::path baseName = musicPath.stem();
 
-    // 1. Í¬Ä¿Â¼ÏÂÕÒ .lrc / .LRC
+    // 1. Í¬Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ .lrc / .LRC
     for (const char* ext : { ".lrc", ".LRC" }) {
         fs::path lrcPath = musicDir / baseName;
         lrcPath += ext;
         if (fs::exists(lrcPath)) {
-            return lrcPath.native();   // fs::path ¡ú PathType£¨Æ½Ì¨Ô­ÉúÀàÐÍ£©
+            return lrcPath.native();   // fs::path ï¿½ï¿½ PathTypeï¿½ï¿½Æ½Ì¨Ô­ï¿½ï¿½ï¿½ï¿½ï¿½Í£ï¿½
         }
     }
 
-    // 2. ³£¼ûµÄ¸è´ÊÎÄ¼þ¼ÐÃû£¨UTF-8 ×ÖÃæÁ¿£¬Á½Æ½Ì¨Í¨ÓÃ£©
+    // 2. ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UTF-8 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ½Ì¨Í¨ï¿½Ã£ï¿½
     const std::vector<fs::path> lyricFolderNames = {
         fs::path("lyrics"),
         fs::path("Lyrics"),
         fs::path("LYRICS"),
-        fs::path("¸è´Ê"),
+        fs::path("ï¿½ï¿½ï¿½"),
         fs::path("LYRIC"),
         fs::path("Lyric"),
     };
@@ -338,22 +347,22 @@ PathType FindLrcFile(const PathType& musicFilePath) {
         for (const auto& entry : fs::directory_iterator(lyricDir)) {
             if (!entry.is_regular_file()) continue;
 
-            // À©Õ¹Ãû±È½Ï£¨Ð¡Ð´£©
+            // ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½È½Ï£ï¿½Ð¡Ð´ï¿½ï¿½
             std::string ext = entry.path().extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                 [](unsigned char c) { return (char)std::tolower(c); });
             if (ext != ".lrc") continue;
 
-            // Ö÷ÎÄ¼þÃû±È½Ï
+            // ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½È½ï¿½
             if (entry.path().stem() == baseName) {
                 return entry.path().native();
             }
         }
     }
 
-    return {};   // ¿Õ PathType
+    return {};   // ï¿½ï¿½ PathType
 }
-// ---------- Í³Ò»Èë¿Ú ----------
+// ---------- Í³Ò»ï¿½ï¿½ï¿½ ----------
 std::vector<unsigned char> ExtractAlbumArt(const PathType& filePath) {
     std::string ext = GetExtension(filePath);
     if (ext == "mp3")   return ExtractFromMP3(filePath);

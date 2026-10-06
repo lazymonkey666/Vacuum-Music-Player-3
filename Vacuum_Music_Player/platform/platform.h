@@ -3,7 +3,9 @@
 // ═══════════════════════════════════════════════════════════
 // 0. 平台判定（全项目唯一一处用编译器内置宏）
 // ═══════════════════════════════════════════════════════════
-#if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
+#if defined(PLATFORM_LINUX)
+    // 已通过 -DPLATFORM_LINUX 指定，直接使用
+#elif defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
 #define PLATFORM_WINDOWS 1
 #elif defined(__APPLE__)
 #define PLATFORM_MACOS   1
@@ -100,6 +102,8 @@
 #include <stdexcept>
 #include <future>
 
+#include <imgui/imgui.h>
+
 // ═══════════════════════════════════════════════════════════
 // 5. 平台类型别名
 // ═══════════════════════════════════════════════════════════
@@ -187,6 +191,9 @@ struct MSG { UINT message; WPARAM wParam; LPARAM lParam; };
 #define WM_SETTINGCHANGE                0x001A
 #define WM_DWMCOLORIZATIONCOLORCHANGED  0x0320
 #define WM_SETICON                      0x0080
+#define WM_CLOSE                        0x0010
+#define WM_QUIT                         0x0012
+
 
 // ─── WM_SIZE / WM_SETICON 参数 ───
 #define SIZE_MINIMIZED  1
@@ -198,8 +205,6 @@ struct MSG { UINT message; WPARAM wParam; LPARAM lParam; };
 
 // ─── socket ───
 #define AF_INET        2
-#define SOCK_STREAM    1
-#define IPPROTO_TCP    6
 #define INVALID_SOCKET (-1)
 #define SOCKET_ERROR   (-1)
 typedef int SOCKET;
@@ -209,6 +214,26 @@ typedef int SOCKET;
 #define MAX_PATH  260
 
 #define closesocket close
+
+using BOOL = int;
+
+#ifndef TRUE
+#define TRUE  1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+#define CP_UTF8   65001
+#define MAX_PATH  260
+
+#define closesocket close
+
+// ─── PeekMessage 标志 ───
+#ifndef PM_REMOVE
+#define PM_REMOVE 0x0001
+#endif
+
 
 #endif // !PLATFORM_WINDOWS
 
@@ -235,7 +260,9 @@ typedef int SOCKET;
 #define WM_PLAY_FAILED           (WM_APP + 201)
 #define WM_SONOS_STOPPED         (WM_APP + 300)
 
-
+#if defined(_WIN32) && !defined(_SOCKLEN_T_DEFINED)
+typedef int socklen_t;
+#endif
 
 
 // ═══════════════════════════════════════════════════════════
@@ -261,6 +288,9 @@ enum class PlaybackStatus { Playing, Paused, Stopped };
 // ═══════════════════════════════════════════════════════════
 
 // ─── 窗口外观 ───
+extern ImFont* g_FontLarge;
+extern ImFont* g_FontNormal;
+
 void     EnableAcrylic(WindowHandle hWnd, uint8_t opacity, uint32_t color);
 bool     IsDarkModeByRegistry();
 uint32_t GetAccentColorFromRegistry();
@@ -301,6 +331,9 @@ uintptr_t StartWindowTimer(WindowHandle hWnd, int intervalMs);
 void      StopWindowTimer(WindowHandle hWnd, uintptr_t timerId);
 
 std::string GetTempDir();
+
+void HideWindowPlat(WindowHandle hWnd);
+void ShowWindowPlat(WindowHandle hWnd);
 
 #if PLATFORM_WINDOWS
 #define MA_DECODER_INIT_FILE     ma_decoder_init_file_w
@@ -360,6 +393,9 @@ TextureHandle LoadAppIcon(int* out_width = nullptr, int* out_height = nullptr);
 void RestartApplication();
 void SaveAndRestart();
 
+void PrepareImGui();
+void UpdateImGuiStyle();
+
 
 // ═══════════════════════════════════════════════════════════
 // 网络适配器枚举
@@ -374,8 +410,34 @@ struct NetAdapterInfo {
 std::vector<NetAdapterInfo> EnumNetworkAdapters();
 
 
+std::string PickFolderDialog(WindowHandle hwndOwner);
+
 
 // ─── WndProc（仅 Windows）───
 #if PLATFORM_WINDOWS
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+#endif
+
+#if PLATFORM_LINUX
+BOOL PostMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+void PostQuitMessage(int exitCode);
+BOOL PeekMessage(MSG* msg, HWND hWnd, UINT filterMin, UINT filterMax, UINT removeMsg);
+void TranslateMessage(MSG* msg);
+void DispatchMessage(MSG* msg);
+void OutputDebugStringA(const char* s);
+void LnxPollEvents();
+void LnxBeginFrame();
+void LnxEndFrame();
+bool LnxWindowShouldClose();
+void* LnxGetWindow();
+
+bool LnxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+void LnxPollMouse();
+void LnxProcessTimers();
+void LnxPollX11Events();
+
+// ─── 单实例锁 ───
+bool AcquireSingleInstanceLock();   // 返回 true=可以启动，false=已有实例
+void ReleaseSingleInstanceLock();
 #endif

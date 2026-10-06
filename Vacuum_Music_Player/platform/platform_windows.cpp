@@ -26,7 +26,6 @@ ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
 ITaskbarList3* g_pTaskbarList = nullptr;
 
 static std::wstring g_className;
-
 HANDLE g_hMutex = NULL;
 
 // 平台内部状态（main.cpp 无需访问）
@@ -779,6 +778,34 @@ TextureHandle LoadTextureFromResource(int resourceId,
 
     return srv;
 }
+void PrepareImGui() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+    io.ConfigDebugHighlightIdConflicts = false;
+    // 加载中文字体
+    // 加载中文字体（正常大小 16px）
+    g_FontNormal = io.Fonts->AddFontFromFileTTF(
+        "c:/Windows/Fonts/msyh.ttc",
+        16.0f, NULL,
+        io.Fonts->GetGlyphRangesChineseFull()
+    );
+    // 加载大号字体（例如 20px，可根据需要调整）
+    g_FontLarge = io.Fonts->AddFontFromFileTTF(
+        "c:/Windows/Fonts/msyh.ttc",
+        20.0f, NULL,
+        io.Fonts->GetGlyphRangesChineseFull()
+    );
+    // 设置默认字体（可选）
+    if (g_FontNormal) io.FontDefault = g_FontNormal;
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    UpdateImGuiStyle();
+
+    ImGui_ImplWin32_Init(g_hWnd);
+    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+}
 
 // platform_windows.cpp
 void OpenUrlInBrowser(const std::string& url) {
@@ -1053,6 +1080,48 @@ std::string PathToUtf8(const PathType& path) {
     WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1,
         &buf[0], len, nullptr, nullptr);
     return buf;
+}
+
+std::string PickFolderDialog(WindowHandle hwndOwner) {
+    std::string folderPath;
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+    IFileOpenDialog* pFileDialog = NULL;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileDialog));
+    if (SUCCEEDED(hr)) {
+        hr = pFileDialog->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+        if (SUCCEEDED(hr)) {
+            hr = pFileDialog->Show(hwndOwner);
+            if (SUCCEEDED(hr)) {
+                IShellItem* pItem;
+                hr = pFileDialog->GetResult(&pItem);
+                if (SUCCEEDED(hr)) {
+                    LPWSTR pszFilePath;
+                    hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+                    if (SUCCEEDED(hr)) {
+                        int len = WideCharToMultiByte(CP_UTF8, 0, pszFilePath, -1, NULL, 0, NULL, NULL);
+                        std::vector<char> buffer(len);
+                        WideCharToMultiByte(CP_UTF8, 0, pszFilePath, -1, buffer.data(), len, NULL, NULL);
+                        folderPath = std::string(buffer.data());
+                        CoTaskMemFree(pszFilePath);
+                    }
+                    pItem->Release();
+                }
+            }
+        }
+        pFileDialog->Release();
+    }
+    CoUninitialize();
+    return folderPath;
+}
+
+void HideWindowPlat(WindowHandle hWnd) {
+    ShowWindow(hWnd, SW_HIDE);
+}
+
+void ShowWindowPlat(WindowHandle hWnd) {
+    ShowWindow(hWnd, SW_SHOW);
+    SetForegroundWindow(hWnd);
 }
 
 #endif // PLATFORM_WINDOWS

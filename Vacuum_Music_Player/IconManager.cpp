@@ -12,6 +12,8 @@
 #include <cstdio>       // ← 为了 snprintf
 #include <cmath>        // ← 为了 powf
 
+#include "embedded_resources.h"
+
 
 void IconManager::Initialize() {//空实现
 }
@@ -19,36 +21,41 @@ void IconManager::Initialize() {//空实现
 void IconManager::Shutdown() {
     for (auto& pair : m_cache) {
         if (pair.second.texture) {
-            pair.second.texture->Release();
+            ReleaseTexture(pair.second.texture);
         }
     }
     m_cache.clear();
 }
 
 // 辅助函数：替换 fill="currentColor" 或 fill="#任意"
-static std::string ReplaceFillColor(const std::string& svgContent, DWORD color) {
+static std::string ReplaceFillColor(const std::string& svgContent, uint32_t color) {
     char colorStr[8];
-    snprintf(colorStr, sizeof(colorStr), "#%02X%02X%02X", (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+    snprintf(colorStr, sizeof(colorStr), "#%02X%02X%02X",
+             (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
     std::string result = svgContent;
-    std::string target = "fill=\"currentColor\"";
-    size_t pos = result.find(target);
-    if (pos != std::string::npos) {
-        result.replace(pos, target.length(), "fill=\"" + std::string(colorStr) + "\"");
+
+    // 替换所有 fill="currentColor"
+    const std::string target = "fill=\"currentColor\"";
+    size_t pos = 0;
+    while ((pos = result.find(target, pos)) != std::string::npos) {
+        result.replace(pos, target.length(),
+                       "fill=\"" + std::string(colorStr) + "\"");
+        pos += strlen(colorStr) + 7;   // "fill=\"" + "#XXXXXX" + "\""
     }
-    else {
-        // 尝试替换 fill="#任意6位"
-        std::string pattern = "fill=\"#";
-        pos = result.find(pattern);
-        if (pos != std::string::npos) {
-            size_t end = result.find("\"", pos + 7);
-            if (end != std::string::npos) {
-                result.replace(pos + 6, end - pos - 6, colorStr + 1); // 跳过 '#'
-            }
-        }
+
+    // 替换所有 fill="#XXXXXX"
+    const std::string pattern = "fill=\"#";
+    pos = 0;
+    while ((pos = result.find(pattern, pos)) != std::string::npos) {
+        size_t end = result.find("\"", pos + 7);
+        if (end == std::string::npos) break;
+        result.replace(pos + 6, end - pos - 6, colorStr + 1);
+        pos += strlen(colorStr);
     }
+
     return result;
 }
-
+#if PLATFORM_WINDOWS
 TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath, int width, int height, uint32_t color) {
 
     // 读取文件
@@ -108,9 +115,75 @@ TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath, int wid
     nsvgDeleteRasterizer(rast);
     nsvgDelete(nsvgImage);
 
-    ID3D11ShaderResourceView* texture = CreateTextureFromRGBA(imgData, width, height);
+    TextureHandle texture = CreateTextureFromRGBA(imgData, width, height);
     return texture;
 }
+#endif
+#if PLATFORM_LINUX
+//程序内嵌资源
+TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath,int width, int height, uint32_t color) {
+    // ─── 从 "resources/play.svg" 提取 "play" ───
+    std::string name = svgPath;
+    const std::string prefix = "resources/";
+    const std::string suffix = ".svg";
+    if (name.compare(0, prefix.size(), prefix) == 0)
+    name = name.substr(prefix.size());
+    if (name.size() > suffix.size() &&
+    name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
+    name = name.substr(0, name.size() - suffix.size());
+
+    // ─── 从嵌入资源里取内容 ───
+    const std::string* svgContentPtr = GetEmbeddedResource(name);
+    if (!svgContentPtr) {
+    OutputDebugStringA(("[icon] embedded resource not found: " + name + "\n").c_str());
+    return nullptr;
+    }
+    std::string svgContent = *svgContentPtr;
+
+    // ─── 替换颜色 ───
+    std::string modifiedSvg = ReplaceFillColor(svgContent, color);
+
+    // ─── 之后的 nanosvg 解析、光栅化、纹理创建 ───
+    std::vector<char> mutableBuffer(modifiedSvg.begin(), modifiedSvg.end());
+    mutableBuffer.push_back('\0');
+
+    NSVGimage* nsvgImage = nsvgParse(mutableBuffer.data(), "px", 96.0f);
+    if (!nsvgImage) return nullptr;
+
+    NSVGrasterizer* rast = nsvgCreateRasterizer();
+    float scaleX = (float)width / nsvgImage->width;
+    float scaleY = (float)height / nsvgImage->height;
+    float scale = (std::min)(scaleX, scaleY);
+    float tx = (width - nsvgImage->width * scale) * 0.5f;
+    float ty = (height - nsvgImage->height * scale) * 0.5f;
+
+    std::vector<unsigned char> imgData(width * height * 4, 0);
+    nsvgRasterize(rast, nsvgImage, tx, ty, scale, imgData.data(), width, height, width * 4);
+
+    unsigned char targetR = (color >> 16) & 0xFF;
+    unsigned char targetG = (color >> 8)  & 0xFF;
+    unsigned char targetB = color & 0xFF;
+    for (int i = 0; i < width * height; ++i) {
+    unsigned char* pixel = imgData.data() + i * 4;
+    if (pixel[3] > 0) {
+    pixel[0] = targetR;
+    pixel[1] = targetG;
+    pixel[2] = targetB;
+    float a = pixel[3] / 255.0f;
+    a = powf(a, 0.85f);
+    pixel[3] = (unsigned char)(a * 255);
+    } else {
+    pixel[0] = pixel[1] = pixel[2] = 0;
+    }
+    }
+    nsvgDeleteRasterizer(rast);
+    nsvgDelete(nsvgImage);
+
+    TextureHandle texture = CreateTextureFromRGBA(imgData, width, height);
+    return texture;
+}
+
+#endif
 
 TextureHandle IconManager::LoadIcon(const std::string& svgPath, int width, int height, uint32_t color) {
     std::string cacheKey = svgPath + "_" + std::to_string(color);
@@ -118,7 +191,7 @@ TextureHandle IconManager::LoadIcon(const std::string& svgPath, int width, int h
     if (it != m_cache.end() && it->second.texture) {
         return it->second.texture;
     }
-    ID3D11ShaderResourceView* tex = LoadIconWithColor(svgPath, width, height, color);
+    TextureHandle tex = LoadIconWithColor(svgPath, width, height, color);
     if (tex) {
         IconCacheEntry entry;
         entry.texture = tex;
@@ -143,7 +216,7 @@ void IconManager::SetThemeColor(uint32_t color) {
     m_currentThemeColor = color;
     for (auto& pair : m_cache) {
         if (pair.second.texture) {
-            pair.second.texture->Release();
+            ReleaseTexture(pair.second.texture);
         }
     }
     m_cache.clear();
