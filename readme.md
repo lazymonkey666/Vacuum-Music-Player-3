@@ -3,7 +3,8 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL-V3)](https://www.gnu.org/licenses/gpl-3.0.html)
 
-**Vacuum Music Player** 是一个**轻量级、高性能**的本地音乐播放器，采用 Visual C++ 构建，图形由ImGui库搭建，基于 miniaudio 音频引擎。支持常见音频格式，内置歌词显示、专辑封面、系统媒体控件（SMTC）以及与 AMLL 服务的 WebSocket 同步。支持远程投射到SONOS音响。支持亚克力效果。
+**Vacuum Music Player** 是一个**轻量级、高性能**的本地音乐播放器，采用 C++ 构建，图形由ImGui库搭建，基于 miniaudio 音频引擎。支持常见音频格式，内置歌词显示、专辑封面、系统媒体控件（SMTC）以及与 AMLL 服务的 WebSocket 同步。支持远程投射到SONOS音响。支持亚克力效果。
+目前支持Windows 10 / 11 , Linux 系统
 
 ---
 
@@ -36,6 +37,8 @@
 
 [janbar/noson: C++ library for accessing SONOS devices.](https://github.com/janbar/noson)
 
+[stb_image](https://github.com/nothings/stb_image) 用于加载图片文件
+
 等等...
 
 Windows SDK（WIC、D3D11）由 Visual Studio 提供。
@@ -46,7 +49,7 @@ Apple Music Like Lyrics（AMLL）服务端（可接受本程序提供的连接AM
 ## 运行说明
 本程序有丰富的功能，为了~~防止你把本程序搞丢~~让你更好的使用程序，这里提供一些快捷键参考：
 
-`ctrl+alt+l`用于显示或者隐藏窗口
+`ctrl+alt+l`用于显示或者隐藏窗口 (此快捷键在Linux下是 `ctrl+alt+h`)
 
 `ctrl+alt+>`下一首
 
@@ -62,15 +65,17 @@ Apple Music Like Lyrics（AMLL）服务端（可接受本程序提供的连接AM
 ## 🛠️ 构建指南
 
 ### 环境要求（编辑项目）
-
+构建Windows版本：
 - **Visual Studio 2026**（或 2022） C++ Windows SDK
 - **Windows 10 / 11**（64 位）
-- Git（用于克隆仓库）
+  
+构建Linux版本:
+- **CMake**(>=3.16)
+
 
 ### 仅运行需求
-若想获得更好的兼容性，可以使用我之前的版本（Windows 7 x64以上，Linux支持（Maybe），Python语言）->[lazymonkey666/Vacuum-Music-Controller-2: A simple music controller for Windows 10/11.](https://github.com/lazymonkey666/Vacuum-Music-Controller-2)
+若想获得更好的兼容性，可以使用我之前的版本（Windows 7 x64以上,Python语言）->[lazymonkey666/Vacuum-Music-Controller-2: A simple music controller for Windows 10/11.](https://github.com/lazymonkey666/Vacuum-Music-Controller-2)
 - **Windows 10 / 11**（64 位）
-- 程序将会占用20MB（左右）的运行内存
 - 程序会占用10MB的硬盘空间
 - D3D11
 ### 项目结构
@@ -87,7 +92,7 @@ Apple Music Like Lyrics（AMLL）服务端（可接受本程序提供的连接AM
    ```bash
    git clone https://github.com/lazymonkey666/Vacuum-Music-Player-3.git
    ```
-2. **打开解决方案** `Vacuum_Music_Player.sln`
+2. **打开解决方案** `Vacuum_Music_Player.sln`或者使用CMake构建项目。
 
 
 ## 说明：本程序是人和AI一起完成的，但是因为时间优先，不能很好的维护仓库，代码上有不妥请见谅。
