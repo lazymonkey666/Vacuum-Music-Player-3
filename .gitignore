@@ -51,6 +51,6 @@ Vacuum_Music_Player/build-release/
 *.so
 
 build-deb/*
-/Vacuum_Music_Player_CMAKE/build-deb
-/Vacuum_Music_Player/main -1004 (bug).cpp
-/Vacuum_Music_Player/main.bak.cpp
+
+main -1004 (bug).cpp
+main.bak.cpp

@@ -1,0 +1,364 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="albumimgtagreader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="manageconfig.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="SonosController.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="SettingItem.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="IconManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="NeteaseAPIManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="AMLLWebSocketV2.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="platform\platform_windows.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketTransport.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXCancellationRequest.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXConnectionState.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXDNSLookup.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXExponentialBackoff.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXGetFreePort.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXGzipCodec.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXHttp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXHttpClient.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXNetSystem.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSelectInterrupt.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSelectInterruptEvent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSelectInterruptFactory.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSetThreadName.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocket.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocketConnect.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocketFactory.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocketTLSOptions.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXStrCaseCompare.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXUdpSocket.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXUrlParser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXUserAgent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXUuid.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocket.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketCloseConstants.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketHandshake.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketHttpHeaders.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\imgui.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\imgui_demo.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\imgui_draw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\imgui_tables.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\imgui_widgets.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\backends\imgui_impl_dx11.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateCodec.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateOptions.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflate.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="albumimgtagreader.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="manageconfig.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SonosController.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingItem.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="IconManager.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="NeteaseAPIManager.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AMLLWebSocketV2.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="platform\platform.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketMessage.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketMessageType.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketOpenInfo.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketSendData.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketSendInfo.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketTransport.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketVersion.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXBase64.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXCancellationRequest.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXConnectionState.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXDNSLookup.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXExponentialBackoff.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXGetFreePort.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXGzipCodec.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXHttp.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXHttpClient.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXNetSystem.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXProgressCallback.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSelectInterrupt.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSelectInterruptEvent.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSelectInterruptFactory.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSetThreadName.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocket.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocketConnect.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocketFactory.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocketTLSOptions.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXStrCaseCompare.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXUdpSocket.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXUniquePtr.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXUrlParser.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXUserAgent.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXUtf8Validator.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXUuid.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocket.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketCloseConstants.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketCloseInfo.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketErrorInfo.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketHandshake.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketHandshakeKeyGen.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketHttpHeaders.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketInitResult.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\imconfig.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\imgui.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\imgui_internal.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\imstb_rectpack.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\imstb_textedit.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\imstb_truetype.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\backends\imgui_impl_dx11.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\imgui\backends\imgui_impl_win32.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\httplib.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\miniaudio.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\nanosvg.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\nanosvgrast.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateCodec.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="vacuum_music_player.ico">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="bitmap1.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="vacuum_music_player_64x64.png">
+      <Filter>资源文件</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

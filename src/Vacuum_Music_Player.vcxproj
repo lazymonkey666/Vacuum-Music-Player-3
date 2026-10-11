@@ -1,0 +1,289 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{f9303337-54d0-482c-ab0f-ff72b44a64cf}</ProjectGuid>
+    <RootNamespace>VacuumMusicPlayer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(SolutionDir)noson-2.12.24\noson\src;$(SolutionDir)noson-2.12.24\build_vc\noson\public\noson;$(SolutionDir)imgui\;$(ProjectDir);$(SolutionDir);D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\imgui;D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player;$(VC_IncludePath);$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(SolutionDir)noson-2.12.24\noson\src;$(SolutionDir)noson-2.12.24\build_vc\noson\public\noson;$(SolutionDir)imgui\;$(ProjectDir);$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_WINSOCKAPI_</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_WINSOCKAPI_</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0;_WINSOCKAPI_</PreprocessorDefinitions>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build_vc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libnoson.lib;d3d11.lib
+;dxgi.lib
+;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;%(AdditionalDependencies);windowsapp.lib;tag.lib;tag.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)libs\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PreLinkEvent>
+      <Command>powershell.exe -ExecutionPolicy Bypass -Command "&amp; '$(ProjectDir)UpdateVer.ps1' -Configuration '$(ConfigurationName)'"</Command>
+    </PreLinkEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0;_WINSOCKAPI_</PreprocessorDefinitions>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build_vc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>libnoson.lib;d3d11.lib
+;dxgi.lib
+;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies);windowsapp.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)libs\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PreLinkEvent>
+      <Command>powershell.exe -ExecutionPolicy Bypass -Command "&amp; '$(ProjectDir)UpdateVer.ps1' -Configuration '$(ConfigurationName)'"</Command>
+    </PreLinkEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\third-party\imgui\backends\imgui_impl_dx11.cpp" />
+    <ClCompile Include="..\third-party\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXCancellationRequest.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXConnectionState.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXDNSLookup.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXExponentialBackoff.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXGetFreePort.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXGzipCodec.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXHttp.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXHttpClient.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXNetSystem.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSelectInterrupt.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSelectInterruptEvent.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSelectInterruptFactory.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSetThreadName.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocket.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocketConnect.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocketFactory.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXSocketTLSOptions.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXStrCaseCompare.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXUdpSocket.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXUrlParser.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXUserAgent.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXUuid.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocket.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketCloseConstants.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketHandshake.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketHttpHeaders.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflate.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateCodec.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateOptions.cpp" />
+    <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketTransport.cpp" />
+    <ClCompile Include="albumimgtagreader.cpp" />
+    <ClCompile Include="AMLLWebSocketV2.cpp" />
+    <ClCompile Include="IconManager.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="manageconfig.cpp" />
+    <ClCompile Include="NeteaseAPIManager.cpp" />
+    <ClCompile Include="platform\platform_windows.cpp" />
+    <ClCompile Include="SettingItem.cpp" />
+    <ClCompile Include="SonosController.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\third-party\httplib.h" />
+    <ClInclude Include="..\third-party\imgui\backends\imgui_impl_dx11.h" />
+    <ClInclude Include="..\third-party\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\third-party\imgui\imconfig.h" />
+    <ClInclude Include="..\third-party\imgui\imgui.h" />
+    <ClInclude Include="..\third-party\imgui\imgui_internal.h" />
+    <ClInclude Include="..\third-party\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\third-party\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\third-party\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXBase64.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXCancellationRequest.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXConnectionState.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXDNSLookup.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXExponentialBackoff.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXGetFreePort.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXGzipCodec.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXHttp.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXHttpClient.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXNetSystem.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXProgressCallback.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSelectInterrupt.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSelectInterruptEvent.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSelectInterruptFactory.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSetThreadName.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocket.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocketConnect.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocketFactory.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXSocketTLSOptions.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXStrCaseCompare.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXUdpSocket.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXUniquePtr.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXUrlParser.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXUserAgent.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXUtf8Validator.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXUuid.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocket.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketCloseConstants.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketCloseInfo.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketErrorInfo.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketHandshake.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketHandshakeKeyGen.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketHttpHeaders.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketInitResult.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketMessage.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketMessageType.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketOpenInfo.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateCodec.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketSendData.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketSendInfo.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketTransport.h" />
+    <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketVersion.h" />
+    <ClInclude Include="..\third-party\miniaudio.h" />
+    <ClInclude Include="..\third-party\nanosvg.h" />
+    <ClInclude Include="..\third-party\nanosvgrast.h" />
+    <ClInclude Include="albumimgtagreader.h" />
+    <ClInclude Include="AMLLWebSocketV2.h" />
+    <ClInclude Include="IconManager.h" />
+    <ClInclude Include="manageconfig.h" />
+    <ClInclude Include="NeteaseAPIManager.h" />
+    <ClInclude Include="platform\platform.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="SettingItem.h" />
+    <ClInclude Include="SonosController.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="bitmap1.bmp" />
+    <Image Include="vacuum_music_player.ico" />
+    <Image Include="vacuum_music_player_64x64.png" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -24,4 +24,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ─── 引入业务子项目 ───
-add_subdirectory(Vacuum_Music_Player_CMAKE)
+add_subdirectory(src)
