@@ -10,6 +10,7 @@
 
 #include <random>
 #include <thread>
+#include <filesystem>
 #include <chrono>
 #include <shellapi.h>
 
@@ -295,6 +296,43 @@ TextureHandle CreateTextureFromRGBA(const std::vector<unsigned char>& rgbaData, 
     g_pd3dDevice->CreateShaderResourceView(texture, nullptr, &srv);  // ← 用 g_pd3dDevice
     texture->Release();
     return srv;
+}
+
+TextureHandle LoadTextureFromFile(const std::string& utf8Path) {
+    if (utf8Path.empty()) return nullptr;
+
+    // 1. UTF-8 -> Windows 宽字符路径
+    PathType wpath = Utf8ToPath(utf8Path);
+    if (wpath.empty()) {
+        OutputDebugStringA(("[LoadTextureFromFile] 路径为空: " + utf8Path + "\n").c_str());
+        return nullptr;
+    }
+
+    // 2. 读文件到内存
+    std::ifstream f(wpath, std::ios::binary);
+    if (!f) {
+        OutputDebugStringA(("[LoadTextureFromFile] 无法打开: " + utf8Path + "\n").c_str());
+        return nullptr;
+    }
+    std::vector<unsigned char> data(
+        (std::istreambuf_iterator<char>(f)),
+        std::istreambuf_iterator<char>());
+    f.close();
+
+    if (data.empty()) {
+        OutputDebugStringA("[LoadTextureFromFile] 文件为空\n");
+        return nullptr;
+    }
+
+    // 3. 复用已有的 WIC 解码路径（定义在本文件上方）
+    TextureHandle tex = CreateTextureFromImageData(data);
+    if (!tex) {
+        OutputDebugStringA(("[LoadTextureFromFile] 解码失败: " + utf8Path + "\n").c_str());
+    }
+    else {
+        OutputDebugStringA(("[LoadTextureFromFile] OK: " + utf8Path + "\n").c_str());
+    }
+    return tex;
 }
 // ═══════════════════════════════════════════════════════════
 // 3. SMTC
@@ -1122,6 +1160,46 @@ void HideWindowPlat(WindowHandle hWnd) {
 void ShowWindowPlat(WindowHandle hWnd) {
     ShowWindow(hWnd, SW_SHOW);
     SetForegroundWindow(hWnd);
+}
+
+// ─────────────────────────────────────────────
+// 解压 zip 到指定目录（静默无黑框）
+// ─────────────────────────────────────────────
+bool ExtractZipFile(const std::string& zipPath, const std::string& destDir) {
+    // 确保目标目录存在
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(Utf8ToPath(destDir)), ec);
+
+
+    // 转宽字符路径
+    PathType wZip = Utf8ToPath(zipPath);
+    PathType wDest = Utf8ToPath(destDir);
+    if (wZip.empty() || wDest.empty()) return false;
+
+    // 使用 Windows 10+ 自带的 tar 命令解压
+    std::wstring cmd = L"tar.exe -xf \"" + wZip + L"\" -C \"" + wDest + L"\"";
+
+    STARTUPINFOW si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    ZeroMemory(&pi, sizeof(pi));
+
+    std::vector<wchar_t> buf(cmd.begin(), cmd.end());
+    buf.push_back(L'\0');
+
+    // 创建进程并隐藏窗口
+    if (CreateProcessW(NULL, buf.data(), NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        DWORD exitCode = 1;
+        GetExitCodeProcess(pi.hProcess, &exitCode);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return exitCode == 0;
+    }
+    return false;
 }
 
 #endif // PLATFORM_WINDOWS

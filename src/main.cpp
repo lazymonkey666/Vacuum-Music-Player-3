@@ -55,6 +55,7 @@ license:GPL-3.0 license
 #include <NeteaseAPIManager.h>
 
 #include <IconManager.h>
+#include <ThemePack.h>
 #include <iostream>
 
 #define HOTKEY_NEXT      1001
@@ -210,6 +211,10 @@ static std::string g_apiAddr = "";
 
 static bool g_netease_account_window_status = false;
 
+static std::string g_activeThemeZip = "";
+
+static bool g_needUpdateStyle = false;
+
 struct MusicMetadata {
     std::string title;
     std::string artist;
@@ -293,8 +298,23 @@ TextureHandle GetIcon(const std::string& name) {
     if (it != g_iconCache.end())
         return it->second;
 
-    // 未加载，则加载
-    std::string path = "resources/" + name + ".svg";
+    std::string path;
+
+    // 优先用主题里的图标
+    auto* theme = ThemePackManager::GetInstance().GetActive();
+    if (theme && !theme->iconsDir.empty()) {
+        std::string themed = theme->iconsDir + "/" + name + ".svg";
+        if (std::filesystem::exists(std::filesystem::path(
+            std::u8string(reinterpret_cast<const char8_t*>(themed.data()), themed.size())))) {
+            path = themed;
+        }
+    }
+
+    // 回落到默认资源
+    if (path.empty()) {
+        path = "resources/" + name + ".svg";
+    }
+
     auto tex = IconManager::GetInstance().LoadIcon(path.c_str(), 16, 16, g_iconColor);
     g_iconCache[name] = tex;
     return tex;
@@ -674,6 +694,7 @@ void WriteMetadataToFile(const std::string& filePath, const NeteaseSongInfo& inf
 }
 
 void UpdateImGuiStyle() {
+    
     ImGuiStyle& style = ImGui::GetStyle();
     bool isDark = false;
     // 1. 获取当前系统深色模式状态和强调色
@@ -690,6 +711,14 @@ void UpdateImGuiStyle() {
     ImVec4 accent = ConvertToImVec4(accentColor);
     g_accent = accent;
     // 2. 设置基础色板 (深色/浅色)
+    if (auto* t = ThemePackManager::GetInstance().GetActive()) { //主题接管
+        DWORD accentColor = GetAccentColorFromRegistry();
+        ImVec4 accent = ConvertToImVec4(accentColor);
+        ThemePackManager::GetInstance().ApplyToImGui(accent, isDark);
+        g_accent = t->accent.useSystem ? accent : t->accent.custom;
+        return;
+    }
+
     if (isDark) {
         // 深色主题基础色
         style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
@@ -1893,13 +1922,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     {
         ApplyTheme(g_dark_mode, g_opacity);
         IconManager::GetInstance().SetThemeColor(g_iconColor);
-        UpdateImGuiStyle();
+        g_needUpdateStyle = true;
         InvalidateRect(hWnd, NULL, TRUE);
     }
     break;   // 必须 break，防止穿透
     case WM_DWMCOLORIZATIONCOLORCHANGED:
         // 强调色改变时（Windows 10/11）
-        UpdateImGuiStyle();
+        g_needUpdateStyle = true;
         InvalidateRect(hWnd, NULL, TRUE);
         break;
     case WM_SIZE:
@@ -2100,6 +2129,18 @@ bool InitWindow(const std::string& className) {
     }
     return true;
 }
+
+void LoadTheme() {
+    if (!g_activeThemeZip.empty()) {
+        // 绝对路径 zip
+        std::string id = ThemePackManager::GetInstance().LoadFromZipAbsolute(g_activeThemeZip);
+        if (id.empty()) {
+            OutputDebugStringA(("加载主题包失败: " + g_activeThemeZip + "\n").c_str());
+        }
+    }
+    ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
+}
+
 void ReadConfig() {
     cfg.Load();
     auto playmode = cfg.GetValue<std::string>("play_mode", "local");
@@ -2120,6 +2161,7 @@ void ReadConfig() {
     }
     g_dark_mode = cfg.GetValue<std::string>("theme_style", "System");
     g_enableSnapToEdge = cfg.GetValue<bool>("enable_snap_to_edge", true);
+    g_activeThemeZip = cfg.GetValue<std::string>("active_theme_zip", "");
 }
 
 void InitUserCookie() {
@@ -2224,6 +2266,16 @@ void RenderFrame(int counter,SettingWindow& settings) {
         draw_list->AddRect(pMin, pMax, borderColor, rounding, 0, 1.0f);
     }
 #endif
+    // 主题背景
+    if (auto* theme = ThemePackManager::GetInstance().GetActive()) {
+        if (theme->backgroundTexture) {
+            draw_list->AddImage(
+                (ImTextureID)theme->backgroundTexture,
+                winPos,
+                ImVec2(winPos.x + winSize.x, winPos.y + winSize.y)
+            );
+        }
+    }
     if (MusicMeta.albumArtSRV) {
         float imgWidth = 230.0f;
         float imgHeight = 230.0f;
@@ -2997,6 +3049,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     InitHotkey(g_hWnd);
     InitSMTC(g_hWnd);
     PrepareImGui();
+    LoadTheme();
+    if (ThemePackManager::GetInstance().GetActive()) {
+        g_iconCache.clear(); // 清理可能提前生成的默认图标
+        UpdateImGuiStyle();  // 强制把主题颜色应用进 ImGuiStyle
+        // 如果主题包里图标颜色需要跟随主题，这里也可以重新设置
+        // IconManager::GetInstance().SetThemeColor(g_iconColor); 
+    }
     UpdateCurrentPlaying(CurrentIndex);
     StartSearchSonos();
     InitTaskbarProgress(g_hWnd);
@@ -3017,6 +3076,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             TranslateMessage(&msg);
             DispatchMessage(&msg);
             continue;
+        }
+        if (g_needUpdateStyle) {
+            g_iconCache.clear();
+            ApplyTheme(g_dark_mode, g_opacity);
+            IconManager::GetInstance().SetThemeColor(g_iconColor);
+            UpdateImGuiStyle();
+            g_needUpdateStyle = false;
+
+
+            // 如果主题里涉及背景图，也可以在这里重新加载
+            // ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
         }
         if (!g_loading_music) {
             if (ma_sound_at_end(&g_CurrentSound) == MA_TRUE && IsPlaying == true && !g_sonos_connect) {
@@ -3183,9 +3253,7 @@ bool LnxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
     switch (msg) {
     case WM_SETTINGCHANGE:
-        ApplyTheme(g_dark_mode, g_opacity);
-        IconManager::GetInstance().SetThemeColor(g_iconColor);
-        UpdateImGuiStyle();
+        g_needUpdateStyle = true;
         return true;
 
     case WM_RBUTTONDOWN: {
@@ -3301,7 +3369,13 @@ int main(int argc, char** argv) {
 
     // TODO: 接 GLFW + ImGui OpenGL3 后端
     PrepareImGui();
-    UpdateImGuiStyle();
+    LoadTheme();
+    if (ThemePackManager::GetInstance().GetActive()) {
+        g_iconCache.clear(); // 清理可能提前生成的默认图标
+        UpdateImGuiStyle();  // 强制把主题颜色应用进 ImGuiStyle
+        // 如果主题包里图标颜色需要跟随主题，这里也可以重新设置
+        // IconManager::GetInstance().SetThemeColor(g_iconColor); 
+    }
 
     UpdateCurrentPlaying(CurrentIndex);
     StartSearchSonos();
@@ -3315,6 +3389,17 @@ int main(int argc, char** argv) {
             if (msg.message == WM_QUIT) break;
             LnxProc(g_hWnd, msg.message, msg.wParam, msg.lParam);   // LnxProc 内部会先调 HandleAppMessage
             continue;
+        }
+        if (g_needUpdateStyle) {
+            g_iconCache.clear();
+            ApplyTheme(g_dark_mode, g_opacity);
+            IconManager::GetInstance().SetThemeColor(g_iconColor);
+            UpdateImGuiStyle();
+            g_needUpdateStyle = false;
+
+
+            // 如果主题里涉及背景图，也可以在这里重新加载
+            // ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
         }
 
         if (!g_loading_music) {

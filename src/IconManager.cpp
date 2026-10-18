@@ -120,30 +120,52 @@ TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath, int wid
 }
 #endif
 #if PLATFORM_LINUX
-//程序内嵌资源
-TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath,int width, int height, uint32_t color) {
-    // ─── 从 "resources/play.svg" 提取 "play" ───
-    std::string name = svgPath;
-    const std::string prefix = "resources/";
-    const std::string suffix = ".svg";
-    if (name.compare(0, prefix.size(), prefix) == 0)
-    name = name.substr(prefix.size());
-    if (name.size() > suffix.size() &&
-    name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
-    name = name.substr(0, name.size() - suffix.size());
+// 程序内嵌资源
+TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath, int width, int height, uint32_t color) {
+    std::string svgContent;
+    bool loaded = false;
 
-    // ─── 从嵌入资源里取内容 ───
-    const std::string* svgContentPtr = GetEmbeddedResource(name);
-    if (!svgContentPtr) {
-    OutputDebugStringA(("[icon] embedded resource not found: " + name + "\n").c_str());
-    return nullptr;
+    // 1. ★ 优先从硬盘读取（支持绝对路径的主题包，或相对路径的 resources 文件夹）
+    std::ifstream file(svgPath, std::ios::binary | std::ios::ate);
+    if (file.is_open()) {
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        std::vector<char> buffer(size + 1);
+        if (file.read(buffer.data(), size)) {
+            buffer[size] = '\0';
+            svgContent = std::string(buffer.data(), size);
+            loaded = true;
+        }
     }
-    std::string svgContent = *svgContentPtr;
+
+    // 2. 如果硬盘读不到，回退到内嵌资源（针对默认图标）
+    if (!loaded) {
+        // ─── 从 "resources/play.svg" 提取 "play" ───
+        std::string name = svgPath;
+        const std::string prefix = "resources/";
+        const std::string suffix = ".svg";
+        if (name.compare(0, prefix.size(), prefix) == 0)
+            name = name.substr(prefix.size());
+        if (name.size() > suffix.size() &&
+            name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
+            name = name.substr(0, name.size() - suffix.size());
+
+        const std::string* svgContentPtr = GetEmbeddedResource(name);
+        if (svgContentPtr) {
+            svgContent = *svgContentPtr;
+            loaded = true;
+        }
+    }
+
+    if (!loaded) {
+        OutputDebugStringA(("[icon] failed to load: " + svgPath + "\n").c_str());
+        return nullptr;
+    }
 
     // ─── 替换颜色 ───
     std::string modifiedSvg = ReplaceFillColor(svgContent, color);
 
-    // ─── 之后的 nanosvg 解析、光栅化、纹理创建 ───
+    // ─── 之后的 nanosvg 解析、光栅化、纹理创建保持不变 ───
     std::vector<char> mutableBuffer(modifiedSvg.begin(), modifiedSvg.end());
     mutableBuffer.push_back('\0');
 
@@ -161,20 +183,21 @@ TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath,int widt
     nsvgRasterize(rast, nsvgImage, tx, ty, scale, imgData.data(), width, height, width * 4);
 
     unsigned char targetR = (color >> 16) & 0xFF;
-    unsigned char targetG = (color >> 8)  & 0xFF;
+    unsigned char targetG = (color >> 8) & 0xFF;
     unsigned char targetB = color & 0xFF;
     for (int i = 0; i < width * height; ++i) {
-    unsigned char* pixel = imgData.data() + i * 4;
-    if (pixel[3] > 0) {
-    pixel[0] = targetR;
-    pixel[1] = targetG;
-    pixel[2] = targetB;
-    float a = pixel[3] / 255.0f;
-    a = powf(a, 0.85f);
-    pixel[3] = (unsigned char)(a * 255);
-    } else {
-    pixel[0] = pixel[1] = pixel[2] = 0;
-    }
+        unsigned char* pixel = imgData.data() + i * 4;
+        if (pixel[3] > 0) {
+            pixel[0] = targetR;
+            pixel[1] = targetG;
+            pixel[2] = targetB;
+            float a = pixel[3] / 255.0f;
+            a = powf(a, 0.85f);
+            pixel[3] = (unsigned char)(a * 255);
+        }
+        else {
+            pixel[0] = pixel[1] = pixel[2] = 0;
+        }
     }
     nsvgDeleteRasterizer(rast);
     nsvgDelete(nsvgImage);
@@ -182,7 +205,6 @@ TextureHandle IconManager::LoadIconWithColor(const std::string& svgPath,int widt
     TextureHandle texture = CreateTextureFromRGBA(imgData, width, height);
     return texture;
 }
-
 #endif
 
 TextureHandle IconManager::LoadIcon(const std::string& svgPath, int width, int height, uint32_t color) {

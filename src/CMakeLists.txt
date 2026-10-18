@@ -44,6 +44,7 @@ set(APP_SOURCES
     ${PROJ_APP}/SonosController.cpp
     ${PROJ_APP}/IconManager.cpp
     ${PROJ_APP}/NeteaseAPIManager.cpp
+    ${PROJ_APP}/ThemePack.cpp
     ${PROJ_APP}/platform/platform_linux.cpp
 )
 

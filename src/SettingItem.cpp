@@ -24,6 +24,7 @@ static bool g_skipvip = false;
 static bool g_enable_cache_limit = true;
 static int g_cache_limit_mb = 2048;
 static bool g_enable_lyric_translate_split = true;
+static std::string g_activeThemeZip = "";
 
 
 SettingWindow::SettingWindow()
@@ -67,6 +68,7 @@ SettingWindow::SettingWindow()
 
     // 外观分类
     SettingCategory appearance("外观");
+    appearance.items.push_back(std::make_unique<SettingItemText>(g_activeThemeZip, "active_theme_zip", "主题压缩包路径"));
     appearance.items.push_back(std::make_unique<SettingItem<int>>(g_acrylic_opacity, "acrylic_opacity", "亚克力透明度", 1, 255));
 
     // 定义映射表：{显示中文, 实际保存值}

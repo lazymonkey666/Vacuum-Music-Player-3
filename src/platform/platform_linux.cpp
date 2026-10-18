@@ -994,4 +994,28 @@ void ShowWindowPlat(WindowHandle) {
     glfwFocusWindow(g_glfwWindow);
 }
 
+
+bool ExtractZipFile(const std::string& zipPath, const std::string& destDir) {
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(std::u8string(
+        reinterpret_cast<const char8_t*>(destDir.data()), destDir.size())), ec);
+
+    // Linux 下用 unzip 命令，重定向输出避免污染终端
+    std::string cmd = "unzip -o \"" + zipPath + "\" -d \"" + destDir + "\" > /dev/null 2>&1";
+    return std::system(cmd.c_str()) == 0;
+}
+
+TextureHandle LoadTextureFromFile(const std::string& utf8Path) {
+    int w, h, channels;
+    // stb_image 加载图片
+    unsigned char* pixels = stbi_load(utf8Path.c_str(), &w, &h, &channels, 4);
+    if (!pixels) return nullptr;
+
+    std::vector<unsigned char> rgba(pixels, pixels + (w * h * 4));
+    stbi_image_free(pixels);
+
+    // 调用平台的纹理创建函数 (你在 Linux 下的 OpenGL 纹理创建)
+    return CreateTextureFromRGBA(rgba, w, h);
+}
+
 #endif // PLATFORM_LINUX

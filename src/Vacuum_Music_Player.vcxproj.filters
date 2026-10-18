@@ -153,6 +153,9 @@
     <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflate.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="ThemePack.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="albumimgtagreader.h">
@@ -342,6 +345,12 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="..\third-party\ixwebsocket\IXWebSocketPerMessageDeflateCodec.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ThemePack.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third-party\zip_file.hpp">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>
