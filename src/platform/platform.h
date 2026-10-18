@@ -415,6 +415,8 @@ std::vector<NetAdapterInfo> EnumNetworkAdapters();
 
 std::string PickFolderDialog(WindowHandle hwndOwner);
 
+std::string PickFileDialog(WindowHandle hwndOwner, const std::string& filter, const std::string& defaultExt);
+
 
 // ─── WndProc（仅 Windows）───
 #if PLATFORM_WINDOWS

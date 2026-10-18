@@ -1018,4 +1018,21 @@ TextureHandle LoadTextureFromFile(const std::string& utf8Path) {
     return CreateTextureFromRGBA(rgba, w, h);
 }
 
+std::string PickFileDialog(WindowHandle, const std::string& title, const std::string& filter) {
+	char buf[512]{};
+	std::string cmd = "zenity --file-selection"
+		" --title=" + ShellEscape(title) +
+		" --file-filter=" + ShellEscape(filter) +
+		" 2>/dev/null";
+	FILE* pipe = popen(cmd.c_str(), "r");
+	if (!pipe) return "";
+	std::string result;
+	if (fgets(buf, sizeof(buf), pipe)) {
+		result = buf;
+		while (!result.empty() && (result.back() == '\n' || result.back() == '\r'))
+			result.pop_back();
+	}
+	pclose(pipe);
+	return result;
+}
 #endif // PLATFORM_LINUX

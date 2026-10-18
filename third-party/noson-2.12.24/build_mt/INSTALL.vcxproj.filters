@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\Vacuum Music Player\Vacuum_Music_Player\Vacuum_Music_Player\third-party\noson-2.12.24\build_mt\CMakeFiles\23c617f9c9f277f1c7ad8cf3c285d8b0\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{BF2E18C2-2EB1-3767-B09F-822F67C44858}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

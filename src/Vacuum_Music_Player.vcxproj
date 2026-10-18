@@ -23,7 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{f9303337-54d0-482c-ab0f-ff72b44a64cf}</ProjectGuid>
     <RootNamespace>VacuumMusicPlayer</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -113,14 +113,14 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build_vc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libnoson.lib;zlib.lib;d3d11.lib
+      <AdditionalDependencies>libnoson.lib;d3d11.lib
 ;dxgi.lib
-;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;%(AdditionalDependencies);windowsapp.lib;tag.lib;tag.lib</AdditionalDependencies>
+;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;%(AdditionalDependencies);windowsapp.lib;zlibstaticd.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)libs\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
@@ -142,16 +142,16 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build_vc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libnoson.lib;zlib.lib;d3d11.lib
+      <AdditionalDependencies>libnoson.lib;d3d11.lib
 ;dxgi.lib
-;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies);windowsapp.lib</AdditionalDependencies>
+;iphlpapi.lib;rpcrt4.lib;d3dcompiler.lib;tag.lib;ws2_32.lib;crypt32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies);windowsapp.lib;zlibstatic.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)libs\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>

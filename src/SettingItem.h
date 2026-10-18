@@ -276,8 +276,6 @@ struct SettingItemRadio : SettingItemBase {
     }
 };
 
-
-
 // 关于信息设置项（只读，不保存任何配置）
 struct SettingItemAbout : SettingItemBase {
     const char* name;   // 配置键名（实际不使用，但为兼容可传空）
