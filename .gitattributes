@@ -1,0 +1,7 @@
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
+*.h linguist-language=C++
+# 将所有 .d 文件标记为 vendored（第三方/生成文件）
+*.d linguist-vendored
+# 忽略所有构建/临时目录
+build*/* linguist-vendored

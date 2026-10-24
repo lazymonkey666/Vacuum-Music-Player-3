@@ -1202,4 +1202,51 @@ bool ExtractZipFile(const std::string& zipPath, const std::string& destDir) {
     return false;
 }
 
+// platform_windows.cpp
+
+std::string PickFileDialog(WindowHandle hwndOwner, const std::string& filter, const std::string& title) {
+    std::string filePath;
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+    IFileOpenDialog* pFileDialog = NULL;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileDialog));
+    if (SUCCEEDED(hr)) {
+        DWORD dwOptions;
+        pFileDialog->GetOptions(&dwOptions);
+        pFileDialog->SetOptions(dwOptions | FOS_FILEMUSTEXIST);
+
+        // 设置标题
+        PathType wTitle = Utf8ToPath(title);
+        pFileDialog->SetTitle(wTitle.c_str());
+
+        // 设置过滤器
+        if (!filter.empty()) {
+            PathType wFilter = Utf8ToPath(filter);
+            COMDLG_FILTERSPEC fileTypes[] = { { L"支持的文件", wFilter.c_str() }, { L"所有文件", L"*.*" } };
+            pFileDialog->SetFileTypes(2, fileTypes);
+        }
+
+        hr = pFileDialog->Show(hwndOwner);
+        if (SUCCEEDED(hr)) {
+            IShellItem* pItem;
+            hr = pFileDialog->GetResult(&pItem);
+            if (SUCCEEDED(hr)) {
+                LPWSTR pszFilePath;
+                hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+                if (SUCCEEDED(hr)) {
+                    int len = WideCharToMultiByte(CP_UTF8, 0, pszFilePath, -1, NULL, 0, NULL, NULL);
+                    std::vector<char> buffer(len);
+                    WideCharToMultiByte(CP_UTF8, 0, pszFilePath, -1, buffer.data(), len, NULL, NULL);
+                    filePath = std::string(buffer.data());
+                    CoTaskMemFree(pszFilePath);
+                }
+                pItem->Release();
+            }
+        }
+        pFileDialog->Release();
+    }
+    CoUninitialize();
+    return filePath;
+}
+
 #endif // PLATFORM_WINDOWS

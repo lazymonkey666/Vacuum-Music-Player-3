@@ -19,6 +19,7 @@
 #include <httplib.h>
 
 
+
 extern WindowHandle g_hWnd;
 
 
@@ -359,7 +360,6 @@ struct SonosController::Impl {
     std::thread httpThread;
     httplib::Server* httpServer = nullptr;
     bool httpRunning = false;
-
     std::chrono::steady_clock::time_point m_playStartTime;
     int m_cachedPositionMs = 0;          // 最后一次校准的进度（毫秒）
     bool m_isPlaying = false;

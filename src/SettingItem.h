@@ -139,17 +139,38 @@ struct SettingItemText : SettingItemBase {
     std::string& value;
     const char* name;
     const char* label;
-    SettingItemText(std::string& val, const char* key, const char* lbl)
-        : value(val), name(key), label(lbl) {}
+    std::string fileFilter; // 新增：如果是文件浏览，填入过滤后缀（如 "*.zip"），为空则只是普通文本框
+
+    SettingItemText(std::string& val, const char* key, const char* lbl, const char* filter = "")
+        : value(val), name(key), label(lbl), fileFilter(filter) {}
 
     void render() override {
         char buf[512];
         std::snprintf(buf, sizeof(buf), "%s", value.c_str());
         ImGui::Text(label);
-        std::string tmp = label;
-        if (ImGui::InputText(("##" + tmp).c_str(), buf, sizeof(buf))) {
-            value = buf;
-            
+        
+        if (!fileFilter.empty()) {
+            // 带有“浏览”按钮的输入框
+            ImGui::PushID(name);
+            if (ImGui::InputText("##path", buf, sizeof(buf))) {
+                value = buf;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("浏览...")) {
+                std::string title = "选择 " + std::string(label);
+                std::string path = PickFileDialog(NULL, fileFilter, title);
+                if (!path.empty()) {
+                    value = path;
+                }
+            }
+            ImGui::PopID();
+        }
+        else {
+            // 普通的文本输入框
+            std::string tmp = label;
+            if (ImGui::InputText(("##" + tmp).c_str(), buf, sizeof(buf))) {
+                value = buf;
+            }
         }
         ImGui::Separator();
     }

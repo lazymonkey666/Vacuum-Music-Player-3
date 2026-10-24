@@ -112,7 +112,7 @@
       <ConformanceMode>false</ConformanceMode>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build_vc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build-msvc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -140,7 +140,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);TAGLIB_STATIC;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WINVER=0x0A00;_WIN64;NPT_CONFIG_THREAD_STACK_SIZE=0;CPPHTTPLIB_USE_WIN32_FILE_IO=0;_WINSOCKAPI_</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build_vc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third-party\imgui;$(SolutionDir)third-party\;$(SolutionDir)third-party\taglib\include;$(SolutionDir)third-party\noson-2.12.24\noson\src;$(SolutionDir)third-party\noson-2.12.24\build-msvc\noson\public\noson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>

@@ -68,7 +68,7 @@ SettingWindow::SettingWindow()
 
     // 外观分类
     SettingCategory appearance("外观");
-    appearance.items.push_back(std::make_unique<SettingItemText>(g_activeThemeZip, "active_theme_zip", "主题压缩包路径"));
+    appearance.items.push_back(std::make_unique<SettingItemText>(g_activeThemeZip, "active_theme_zip", "主题压缩包路径", "*.zip"));
     appearance.items.push_back(std::make_unique<SettingItem<int>>(g_acrylic_opacity, "acrylic_opacity", "亚克力透明度", 1, 255));
 
     // 定义映射表：{显示中文, 实际保存值}
