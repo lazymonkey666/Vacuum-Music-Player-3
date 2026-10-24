@@ -216,6 +216,11 @@ static std::string g_activeThemeZip = "";
 
 static bool g_needUpdateStyle = false;
 
+static TextureHandle g_prevAlbumArt = nullptr;      // 保留上一张图的句柄用于淡出
+static float g_albumArtFadeAlpha = 1.0f;            // 0.0 = 完全显示旧图, 1.0 = 完全显示新图
+static bool g_isAlbumArtTransitioning = false;      // 是否正在播放动画
+static std::chrono::steady_clock::time_point g_albumArtTransStartTime;
+
 struct MusicMetadata {
     std::string title;
     std::string artist;
@@ -1007,7 +1012,9 @@ std::string ExtractExtensionFromUrl(const std::string& url) {
 void PlayLocalFile(const std::string filepath_utf8) {
     PathType widePath = Utf8ToPath(filepath_utf8);
     if (widePath.empty()) return;
+    TextureHandle oldArt = MusicMeta.albumArtSRV;//覆盖结构体
     MusicMeta = GetMusicMetadata(filepath_utf8);
+    MusicMeta.albumArtSRV = oldArt;
     if (!g_sonos_connect) {
         // 使用流式加载（streaming）以降低内存占用，适用于本地播放大文件
         if (MA_SOUND_INIT_FROM_FILE(&g_AudioEngine, widePath.c_str(), MA_SOUND_FLAG_STREAM, NULL, NULL, &g_CurrentSound) != MA_SUCCESS) {
@@ -1147,12 +1154,10 @@ void PlayLocalFile(const std::string filepath_utf8) {
             }).detach(); // ★ 彻底分离，主线程绝对不卡
     }
     else {
-        // 没有封面，清空纹理
-        if (MusicMeta.albumArtSRV) {
-            OutputDebugStringA("[PlayLocalFile] no album art\n");
-            ReleaseTexture(MusicMeta.albumArtSRV);
-            MusicMeta.albumArtSRV = nullptr;
-        }
+        // 没有封面，发一个空结果给主线程触发淡出动画
+        AlbumArtAsyncResult* emptyResult = new AlbumArtAsyncResult();
+        emptyResult->targetIndex = currentTaskId;
+        PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(emptyResult));
     }
 
     // 4. 发送 AMLL 消息（使用提前准备好的 amllCoverData）
@@ -1177,12 +1182,14 @@ void PlayLocalFile(const std::string filepath_utf8) {
 void PlayMusicFile(const std::string& filepath_utf8) {
     g_loading_music = true;
     SetStatus(STATUS_FETCHING_URL);
+
     if (g_IsSoundLoaded) {
         ma_sound_stop(&g_CurrentSound);
         ma_sound_uninit(&g_CurrentSound);
         g_IsSoundLoaded = false;
     }
     g_scrollBlockCounter = 0;
+
     if (!g_online_player) {
         PlayLocalFile(filepath_utf8);
         g_loading_music = false;
@@ -1190,13 +1197,11 @@ void PlayMusicFile(const std::string& filepath_utf8) {
     }
 
     int currentTaskId = ++g_AsyncTaskId_download;
-    // 记录当前索引（用于获取封面URL等）
     int idx = CurrentIndex;
-
-    // 拷贝 Cookie，避免多线程读写死锁
     std::string cookieCopy = g_netease_user_cookie;
-    // 启动异步任务
-    g_onlinePlayFuture = std::async(std::launch::async, [filepath_utf8, currentTaskId, idx]() {
+
+    // ★ 终极修复：改用 std::thread 彻底分离，主线程绝不等待！
+    std::thread([filepath_utf8, currentTaskId, idx, cookieCopy]() {
         AsyncPlayResult result;
         result.taskId = currentTaskId;
         result.index = idx;
@@ -1205,14 +1210,18 @@ void PlayMusicFile(const std::string& filepath_utf8) {
 
         try {
             // 3.1 获取播放 URL
-            std::string playUrl = NeteaseAPIManager::GetInstance().GetSongUrl(filepath_utf8, "exhigh",g_netease_user_cookie);
+            std::string playUrl = NeteaseAPIManager::GetInstance().GetSongUrl(filepath_utf8, "exhigh", cookieCopy);
+
+            // ★ 如果在请求 URL 的时候用户已经切歌，直接放弃，别下载了
+            if (currentTaskId != g_AsyncTaskId_download) return;
+
             if (playUrl.empty()) {
                 result.errorMsg = "获取播放 URL 失败";
                 PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
                 return;
             }
             std::string extension = ".mp3";
-            if (ExtractExtensionFromUrl(playUrl)==".flac") {
+            if (ExtractExtensionFromUrl(playUrl) == ".flac") {
                 extension = ".flac";
             }
 
@@ -1238,8 +1247,11 @@ void PlayMusicFile(const std::string& filepath_utf8) {
                 return;
             }
 
-            // 3.5 下载封面（如果封面URL存在）
-            std::string coverUrl = g_online_album_urls[idx]; // 假设全局数组已填充
+            // ★ 下载完歌曲后，再检查一次是否被切歌
+            if (currentTaskId != g_AsyncTaskId_download) return;
+
+            // 3.5 下载封面
+            std::string coverUrl = g_online_album_urls[idx];
             if (!coverUrl.empty()) {
                 if (!DownloadFile(coverUrl, imagePath)) {
                     OutputDebugStringA(("下载封面失败: " + coverUrl + "\n").c_str());
@@ -1249,26 +1261,27 @@ void PlayMusicFile(const std::string& filepath_utf8) {
                 EnforceCacheLimit(g_cache_limit_mb);
             }
             SetStatus(STATUS_FETCHING_META);
-            
 
             // 3.6 获取歌词
             std::string lyrics = NeteaseAPIManager::GetInstance().GetLyrics(filepath_utf8);
 
-            // 3.7 获取歌曲完整信息（用于标签）
+            // ★ 获取歌词后，再检查一次
+            if (currentTaskId != g_AsyncTaskId_download) return;
+
+            // 3.7 获取歌曲完整信息
             NeteaseSongInfo info = NeteaseAPIManager::GetInstance().GetSongFullInfo(filepath_utf8);
-            
+
             SetStatus(STATUS_WRITING_TAGS);
-            // 3.8 写入元数据（封面、歌词等）
+
+            // 3.8 写入元数据
             if (std::filesystem::exists(imagePath)) {
                 WriteMetadataToFile(localPath, info, imagePath, lyrics);
-                std::filesystem::remove(imagePath); // 清理临时封面
+                std::filesystem::remove(imagePath);
             }
             else {
-                // 仍写入基本标签
                 WriteMetadataToFile(localPath, info, "", lyrics);
             }
 
-            // 成功
             result.localPath = localPath;
             result.success = true;
             PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
@@ -1278,54 +1291,9 @@ void PlayMusicFile(const std::string& filepath_utf8) {
             result.errorMsg = e.what();
             PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
         }
-        });
-        //原先方法实现：
-        //std::string playUrl;
-        //try {
-        //    std::stoll(filepath_utf8); // 若能转换，视为 ID
-        //    playUrl = NeteaseAPIManager::GetInstance().GetSongUrl(filepath_utf8, "exhigh");
-        //    if (playUrl.empty()) {
-        //        OutputDebugStringA("获取在线播放 URL 失败\n");
-        //        return;
-        //    }
-        //}
-        //catch (...) {
-        //    // 不是 ID，保持原路径（可能是 URL）
-        //}
-        //std::string ext = ".mp3"; // 简单处理，或从url提取
-        //std::string cacheDir = GetCacheDirectory();
-        //std::string localPath = cacheDir + filepath_utf8 + ext;
-        //std::string imagePath = cacheDir + "temp_cover" + ".jpg";
+        }).detach(); // ★ 彻底分离，瞬间返回
 
-        //// 检查是否已缓存（若文件存在且大小>0）
-        //if (!std::filesystem::exists(localPath) || std::filesystem::file_size(localPath) == 0) {
-        //    OutputDebugStringA(("下载歌曲: " + playUrl + " -> " + localPath + "\n").c_str());
-        //    if (!DownloadFile(playUrl, localPath)) {
-        //        OutputDebugStringA(("下载失败: " + playUrl + "\n").c_str());
-        //        g_loading_music = false;
-        //        return;
-        //    }
-        //    if (!DownloadFile(g_online_album_urls[CurrentIndex], imagePath)) {
-        //        OutputDebugStringA(("下载专辑图失败: " + g_online_album_urls[CurrentIndex] + "\n").c_str());
-        //    }
-        //    std::string lyrics = NeteaseAPIManager::GetInstance().GetLyrics(filepath_utf8);
-        //    WriteMetadataToFile(localPath, NeteaseAPIManager::GetInstance().GetSongFullInfo(filepath_utf8), imagePath,lyrics);
-        //}
-        //PlayLocalFile(localPath);
-        //MusicMeta = GetMusicMetadata(localPath);
-        
-        //if (fs::exists(imagePath)) {
-        //    fs::remove(imagePath);
-        //}
-       
-
-    
-
-
-
-    // ======================================================
-    OutputDebugStringA(("正在播放: " + filepath_utf8 + MusicMeta.title + MusicMeta.artist + "\n").c_str());
-    
+    OutputDebugStringA(("正在播放: " + filepath_utf8 + "\n").c_str());
 }
 
 
@@ -1716,9 +1684,12 @@ uint32_t GetIconColorForTheme(const std::string& mode) {
 
 void OnReadyPlay(AsyncPlayResult* result) {
     if (result->taskId != g_AsyncTaskId_download) {
-        delete result; // 过期任务，丢弃
+        // 收到的是过期任务的消息，丢弃
+        OutputDebugStringA("[OnReadyPlay] 丢弃过期任务\n");
+        delete result;
         return;
     }
+
     if (result->success) {
         CurrentIndex = result->index;
         PlayLocalFile(result->localPath);
@@ -1726,6 +1697,7 @@ void OnReadyPlay(AsyncPlayResult* result) {
     else {
         OutputDebugStringA(("播放失败: " + result->errorMsg + "\n").c_str());
     }
+
     delete result;
     g_loading_music = false;
 }
@@ -1775,30 +1747,31 @@ void OnDragEnd() {
 }
 
 void OnAlbumArtReady(AlbumArtAsyncResult* result) {
-    if (!result) {
-        OutputDebugStringA("[OnAlbumArtReady] null result\n");
-        return;
-    }
-    OutputDebugStringA(("[OnAlbumArtReady] targetIndex=" + std::to_string(result->targetIndex) +
-                        " current=" + std::to_string(g_AsyncTaskId_search) +
-                        " rgbaSize=" + std::to_string(result->rgbaData.size()) +
-                        " w=" + std::to_string(result->width) +
-                        " h=" + std::to_string(result->height) + "\n").c_str());
+    if (!result) return;
 
+    // 只有最新任务才处理
     if (result->targetIndex == g_AsyncTaskId_search) {
-        if (!result->rgbaData.empty()) {
-            if (MusicMeta.albumArtSRV) {
-                ReleaseTexture(MusicMeta.albumArtSRV);
-                MusicMeta.albumArtSRV = nullptr;
-            }
-            MusicMeta.albumArtSRV = CreateTextureFromRGBA(result->rgbaData, result->width, result->height);
-            OutputDebugStringA(("[OnAlbumArtReady] texture=" + std::to_string((intptr_t)MusicMeta.albumArtSRV) + "\n").c_str());
-        } else {
-            OutputDebugStringA("[OnAlbumArtReady] rgbaData empty\n");
+        // 1. 把当前正在显示的图移交给“上一张”
+        if (g_prevAlbumArt) {
+            ReleaseTexture(g_prevAlbumArt); // 如果还有更早的，先释放
+            g_prevAlbumArt = nullptr;
         }
-    } else {
-        OutputDebugStringA("[OnAlbumArtReady] discarded stale\n");
+        if (MusicMeta.albumArtSRV) {
+            g_prevAlbumArt = MusicMeta.albumArtSRV;
+            MusicMeta.albumArtSRV = nullptr;
+        }
+
+        // 2. 创建新图 (如果 rgbaData 为空，说明是纯淡出，新图就是 nullptr)
+        if (!result->rgbaData.empty()) {
+            MusicMeta.albumArtSRV = CreateTextureFromRGBA(result->rgbaData, result->width, result->height);
+        }
+
+        // 3. 启动交叉淡入淡出动画
+        g_albumArtFadeAlpha = 0.0f;
+        g_isAlbumArtTransitioning = true;
+        g_albumArtTransStartTime = std::chrono::steady_clock::now(); // ★ 新增：记录时间点
     }
+
     delete result;
 }
 
@@ -2293,12 +2266,45 @@ void RenderFrame(int counter,SettingWindow& settings) {
             );
         }
     }
-    if (MusicMeta.albumArtSRV) {
-        float imgWidth = 230.0f;
-        float imgHeight = 230.0f;
-        ImVec2 imgPos(winPos.x + winSize.x - imgWidth, winPos.y);  // 右上角对齐
-        draw_list->AddImage((ImTextureID)MusicMeta.albumArtSRV, imgPos, ImVec2(imgPos.x + imgWidth, imgPos.y + imgHeight));
+        // ================= 处理专辑图淡入淡出动画 =================
+        // ================= 处理专辑图淡入淡出动画 =================
+    if (g_isAlbumArtTransitioning) {
+        auto now = std::chrono::steady_clock::now();
+        float elapsed = std::chrono::duration<float>(now - g_albumArtTransStartTime).count();
+
+        // 0.35 秒完成过渡，再也不怕卡顿跳帧
+        g_albumArtFadeAlpha = elapsed / 0.35f;
+
+        if (g_albumArtFadeAlpha >= 1.0f) {
+            g_albumArtFadeAlpha = 1.0f;
+            g_isAlbumArtTransitioning = false;
+            // 动画结束，彻底释放旧图
+            if (g_prevAlbumArt) {
+                ReleaseTexture(g_prevAlbumArt);
+                g_prevAlbumArt = nullptr;
+            }
+        }
     }
+
+    float imgWidth = 230.0f;
+    float imgHeight = 230.0f;
+    ImVec2 imgPos(winPos.x + winSize.x - imgWidth, winPos.y);
+    ImVec2 imgEndPos(imgPos.x + imgWidth, imgPos.y + imgHeight);
+
+    // 1. 绘制旧图（透明度从 1.0 渐变到 0.0）
+    if (g_prevAlbumArt) {
+        float alpha = 1.0f - g_albumArtFadeAlpha;
+        ImU32 tint = ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, alpha));
+        draw_list->AddImage((ImTextureID)g_prevAlbumArt, imgPos, imgEndPos, ImVec2(0,0), ImVec2(1,1), tint);
+    }
+
+    // 2. 绘制新图（透明度从 0.0 渐变到 1.0）
+    if (MusicMeta.albumArtSRV) {
+        float alpha = g_albumArtFadeAlpha;
+        ImU32 tint = ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, alpha));
+        draw_list->AddImage((ImTextureID)MusicMeta.albumArtSRV, imgPos, imgEndPos, ImVec2(0,0), ImVec2(1,1), tint);
+    }
+    // ==========================================================
 
 
     // 左侧区域宽度
@@ -2765,35 +2771,35 @@ void RenderFrame(int counter,SettingWindow& settings) {
         ImVec2 rightTextSize = ImGui::CalcTextSize(progress_text.c_str());
         float rightTextWidth = rightTextSize.x + 6.0f;  // 右侧留6px边距
 
-        // 左侧文本可用宽度 = 总宽度 - 右侧文本宽度 - 左侧边距(6px)
+        // 左侧文本可用宽度 = 总宽度 - 右侧文本宽度 - 边距
         float leftAvailableWidth = barWidth - rightTextWidth - 24.0f;
 
-        // 裁剪左侧文本以适应可用宽度
         std::string display_left_text = now_playing_text;
-        ImVec2 leftTextSize = ImGui::CalcTextSize(display_left_text.c_str());
-        if (leftTextSize.x > leftAvailableWidth && leftAvailableWidth > 0) {
-            // 二分法快速找到合适的裁剪长度（也可以逐字符减少，但二分更高效）
-            std::string ellipsis = "...";
-            int lo = 0, hi = (int)now_playing_text.length();
-            int bestLen = 0;
-            while (lo <= hi) {
-                int mid = (lo + hi) / 2;
-                std::string candidate = now_playing_text.substr(0, mid) + ellipsis;
-                ImVec2 sz = ImGui::CalcTextSize(candidate.c_str());
-                if (sz.x <= leftAvailableWidth) {
-                    bestLen = mid;
-                    lo = mid + 1;
+
+        // 如果连 "..." 都放不下，直接不显示
+        float ellipsisWidth = ImGui::CalcTextSize("...").x;
+        if (leftAvailableWidth <= ellipsisWidth) {
+            display_left_text = "";
+        }
+        // 如果左侧文本超长，开始裁剪
+        else if (ImGui::CalcTextSize(display_left_text.c_str()).x > leftAvailableWidth) {
+            int cut_len = (int)now_playing_text.length();
+            float max_text_width = leftAvailableWidth - ellipsisWidth;
+
+            // ★ 从后往前遍历寻找安全截断点，绝对不会死循环
+            while (cut_len > 0) {
+                // 安全 UTF-8 边界检查：如果切到了汉字的中间字节，继续往前退
+                while (cut_len > 0 && (now_playing_text[cut_len] & 0xC0) == 0x80) {
+                    cut_len--;
                 }
-                else {
-                    hi = mid - 1;
+
+                std::string sub = now_playing_text.substr(0, cut_len);
+                if (ImGui::CalcTextSize(sub.c_str()).x <= max_text_width) {
+                    break; // 找到合适长度了，退出
                 }
+                cut_len--; // 还是太长，继续往前退
             }
-            if (bestLen > 0) {
-                display_left_text = now_playing_text.substr(0, bestLen) + ellipsis;
-            }
-            else {
-                display_left_text = ellipsis;
-            }
+            display_left_text = now_playing_text.substr(0, cut_len) + "...";
         }
 
         // 计算文字垂直居中位置
@@ -2801,12 +2807,20 @@ void RenderFrame(int counter,SettingWindow& settings) {
 
         // 绘制
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        // 左侧文本（左对齐，左边距6px）
-        drawList->AddText(ImVec2(barMin.x + 6.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), display_left_text.c_str());
-        // 右侧文本（右对齐，右边距6px）
+
+        // ★ 加上物理裁剪，超出进度条左侧区域的文字会被 GPU 直接切掉，绝对不越界
+        drawList->PushClipRect(barMin, ImVec2(barMax.x - rightTextWidth - 6.0f, barMax.y), true);
+
+        // 绘制左侧文本（左对齐，左边距6px）
+        if (!display_left_text.empty()) {
+            drawList->AddText(ImVec2(barMin.x + 6.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), display_left_text.c_str());
+        }
+
+        drawList->PopClipRect();
+
+        // 绘制右侧文本（右对齐，右边距6px）
         float rightTextX = barMax.x - rightTextSize.x - 6.0f;
         drawList->AddText(ImVec2(rightTextX, textY), ImGui::GetColorU32(ImGuiCol_Text), progress_text.c_str());
-
         ImGui::EndChild();
 
     }
@@ -2814,7 +2828,12 @@ void RenderFrame(int counter,SettingWindow& settings) {
     float paneHeight = ImGui::GetWindowHeight() - (8.0f) * 2;
     // 同一行绘制分割条
     ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.05f));
+    if (g_resizingSplitter) {
+        ImGui::PushStyleColor(ImGuiCol_Button, g_accent);
+    }
+    else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.05f));
+    }
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, g_accent);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, g_accent);
     ImGui::Button("##Splitter", ImVec2(splitterWidth, paneHeight));
