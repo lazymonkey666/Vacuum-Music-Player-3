@@ -50,7 +50,10 @@ Vacuum_Music_Player/build-release/
 *.a
 *.so
 
-build-deb/*
+*build-deb/*
 
 main -1004 (bug).cpp
 main.bak.cpp
+
+*.deb
+
