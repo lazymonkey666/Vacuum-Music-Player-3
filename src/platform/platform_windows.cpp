@@ -355,6 +355,9 @@ void InitSMTC(WindowHandle hWnd) {
     g_smtc.IsPauseEnabled(true);
     g_smtc.IsNextEnabled(true);
     g_smtc.IsPreviousEnabled(true);
+    g_smtc.IsStopEnabled(true);
+    g_smtc.IsChannelUpEnabled(false);
+    g_smtc.IsChannelDownEnabled(false);
 
     // 注册按钮点击事件（使用 lambda）
     g_smtc.ButtonPressed([](const auto& sender, const auto& args) {
@@ -396,7 +399,9 @@ void UpdateSMTC(
     const std::string& title,
     const std::string& artist,
     const std::string& album,
-    const std::vector<unsigned char>& thumbnailData)
+    const std::vector<unsigned char>& thumbnailData,
+    uint64_t durationMs)
+
 {
     using namespace winrt;
     using namespace Windows::Storage::Streams;
@@ -443,6 +448,26 @@ void UpdateSMTC(
     }
 
     updater.Update();
+    SystemMediaTransportControlsTimelineProperties timeline;
+    timeline.StartTime(TimeSpan{ 0 });
+    timeline.MinSeekTime(TimeSpan{ 0 });
+    timeline.Position(TimeSpan{ 0 });
+    // SMTC 的时间单位是 100 纳秒 (ticks)，1 毫秒 = 10000 ticks
+    timeline.EndTime(TimeSpan{ std::chrono::duration_cast<std::chrono::seconds>(std::chrono::milliseconds(durationMs)) });
+
+    // 这里为了精度，直接乘 10000
+    // 直接计算 Ticks (100纳秒)，毫秒 * 10000
+    timeline.EndTime(winrt::Windows::Foundation::TimeSpan{ static_cast<int64_t>(durationMs) * 10000 });
+    g_smtc.UpdateTimelineProperties(timeline);
+}
+
+void UpdateSMTCProgress(uint64_t currentMs) {
+    if (!g_smtc) return;
+
+    winrt::Windows::Media::SystemMediaTransportControlsTimelineProperties timeline;
+    // 直接用 int64_t 构造
+    timeline.Position(winrt::Windows::Foundation::TimeSpan{ static_cast<int64_t>(currentMs) * 10000 });
+    g_smtc.UpdateTimelineProperties(timeline);
 }
 
 // ═══════════════════════════════════════════════════════════

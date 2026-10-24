@@ -162,6 +162,7 @@ static bool g_enableSnapToEdge = true;
 
 static std::string g_musicPath = "";
 
+static std::future<void> g_onlinePlayFuture;
 
 UINT g_uTaskbarBtnMsg = 0;
 
@@ -246,6 +247,7 @@ enum StatusCode {
     STATUS_FETCHING_URL = 1,
     STATUS_DOWNLOADING = 2,
     STATUS_WRITING_TAGS = 3,
+    STATUS_FETCHING_META = 4,
     STATUS_ERROR = -1
 };
 
@@ -289,6 +291,7 @@ inline const char* GetStatusText() {
     case STATUS_FETCHING_URL:   return "正在获取播放链接";
     case STATUS_DOWNLOADING:    return "正在下载歌曲";
     case STATUS_WRITING_TAGS:   return "正在写入标签";
+    case STATUS_FETCHING_META:  return "正在获取元数据";
     default:                    return "未知";
     }
 }
@@ -1100,10 +1103,10 @@ void PlayLocalFile(const std::string filepath_utf8) {
     if (!rawAlbumData.empty()) {
         std::vector<unsigned char> jpegData = ConvertImageToJPEG(rawAlbumData);
         if (!jpegData.empty()) {
-            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, jpegData);
+            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, jpegData,PlayMusicLongMs);
         }
         else {
-            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, rawAlbumData);
+            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, rawAlbumData, PlayMusicLongMs);
         }
     }
 
@@ -1115,23 +1118,33 @@ void PlayLocalFile(const std::string filepath_utf8) {
         std::string album = MusicMeta.album;
         std::vector<unsigned char> rawDataCopy = rawAlbumData;  // 拷贝一份，不是 move
 
-        std::async(std::launch::async, [rawDataCopy, title, artist, album, currentTaskId]() {
+        // ★ 改成 std::thread 并 detach
+        std::thread([rawDataCopy, title, artist, album, currentTaskId]() {
+            // 1. 检查是否已经切歌（过期任务直接退出，不浪费 CPU）
+            if (currentTaskId != g_AsyncTaskId_search) return;
+
+            // 2. 处理封面
             std::vector<unsigned char> processedForUI = ProcessAlbumArtWithGradient(rawDataCopy, 230, 230);
             if (processedForUI.empty()) {
                 OutputDebugStringA("ProcessAlbumArtWithGradient failed\n");
                 return;
             }
+
+            // 3. 再次检查（因为处理图片可能耗时，处理完可能用户已经切歌了）
+            if (currentTaskId != g_AsyncTaskId_search) return;
+
+            // 4. 封装数据并发送给主线程
             AlbumArtAsyncResult* result = new AlbumArtAsyncResult();
             result->width = 230;
             result->height = 230;
             result->rgbaData = std::move(processedForUI);
-            result->rawData = rawDataCopy;  // 也可以移动，但注意后面不再需要
+            result->rawData = rawDataCopy;
             result->title = title;
             result->artist = artist;
             result->album = album;
             result->targetIndex = currentTaskId;
             PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(result));
-            });
+            }).detach(); // ★ 彻底分离，主线程绝对不卡
     }
     else {
         // 没有封面，清空纹理
@@ -1180,8 +1193,10 @@ void PlayMusicFile(const std::string& filepath_utf8) {
     // 记录当前索引（用于获取封面URL等）
     int idx = CurrentIndex;
 
+    // 拷贝 Cookie，避免多线程读写死锁
+    std::string cookieCopy = g_netease_user_cookie;
     // 启动异步任务
-    std::async(std::launch::async, [filepath_utf8, currentTaskId, idx]() {
+    g_onlinePlayFuture = std::async(std::launch::async, [filepath_utf8, currentTaskId, idx]() {
         AsyncPlayResult result;
         result.taskId = currentTaskId;
         result.index = idx;
@@ -1233,14 +1248,16 @@ void PlayMusicFile(const std::string& filepath_utf8) {
             if (g_cache_clean) {
                 EnforceCacheLimit(g_cache_limit_mb);
             }
-            SetStatus(STATUS_WRITING_TAGS);
+            SetStatus(STATUS_FETCHING_META);
+            
 
             // 3.6 获取歌词
             std::string lyrics = NeteaseAPIManager::GetInstance().GetLyrics(filepath_utf8);
 
             // 3.7 获取歌曲完整信息（用于标签）
             NeteaseSongInfo info = NeteaseAPIManager::GetInstance().GetSongFullInfo(filepath_utf8);
-
+            
+            SetStatus(STATUS_WRITING_TAGS);
             // 3.8 写入元数据（封面、歌词等）
             if (std::filesystem::exists(imagePath)) {
                 WriteMetadataToFile(localPath, info, imagePath, lyrics);
@@ -3137,6 +3154,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         counter++;
         if (counter >= 60) {
             counter = 0;
+        }
+        // 大约每 1 秒更新一次即可，太频繁会卡
+        if (counter % 60 == 0 && g_IsSoundLoaded) {
+            UpdateSMTCProgress(PlayCurrentMs);
         }
         if (g_scrollBlockCounter > 0) {
             g_scrollBlockCounter--;

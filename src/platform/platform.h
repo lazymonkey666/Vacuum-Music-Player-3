@@ -306,7 +306,9 @@ void SetSMTCPlaybackStatus(PlaybackStatus status);
 void UpdateSMTC(const std::string& title,
     const std::string& artist,
     const std::string& album,
-    const std::vector<unsigned char>& cover);
+    const std::vector<unsigned char>& cover,
+    uint64_t durationMs);
+void UpdateSMTCProgress(uint64_t currentMs);
 
 // ─── 任务栏进度 ───
 bool InitTaskbarProgress(WindowHandle hWnd);

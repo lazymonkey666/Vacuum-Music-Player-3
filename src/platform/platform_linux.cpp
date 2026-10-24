@@ -353,7 +353,7 @@ bool CreateDeviceD3D(WindowHandle) { return true; }
 void InitSMTC(WindowHandle) {}
 void SetSMTCPlaybackStatus(PlaybackStatus) {}
 void UpdateSMTC(const std::string&, const std::string&, const std::string&, const std::vector<unsigned char>&) {}
-
+void UpdateSMTCProgress(uint64_t currentMs) {}
 // ═══════════════════════════════════════════════════════════
 // 任务栏
 // ═══════════════════════════════════════════════════════════
