@@ -53,4 +53,5 @@ $content = $content -replace 'VALUE "ProductVersion", "[^"]+"', "VALUE `"Product
 Set-ItemProperty $rcPath -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
 $content | Out-File $rcPath -Encoding Default -NoNewline
 
+
 exit 0

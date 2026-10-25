@@ -78,6 +78,8 @@ add_custom_command(
     VERBATIM
 )
 
+add_compile_options(-w)
+
 # --- Target ---
 add_executable(Vacuum_Music_Player_CMAKE
     ${APP_SOURCES} ${IMGUI_SOURCES} ${IXWS_SOURCES} ${GENERATED_CPP})
@@ -105,6 +107,47 @@ target_compile_definitions(Vacuum_Music_Player_CMAKE PRIVATE
     IXWEBSOCKET_USE_OPEN_SSL
 )
 
+# --- Version config ---
+
+# 如果外部（比如 build.sh）没有传入 APP_VERSION_STRING
+if(NOT DEFINED APP_VERSION_STRING)
+    set(VER_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/ver.config")
+    set(VERSION_MAJOR "0")
+    set(VERSION_MONTH "0")
+    set(VERSION_BUILD "0")
+
+    if(EXISTS "${VER_CONFIG_FILE}")
+        file(STRINGS "${VER_CONFIG_FILE}" VER_LINES)
+        foreach(LINE IN LISTS VER_LINES)
+            if(LINE MATCHES "^MAJOR=([0-9]+)")
+                set(VERSION_MAJOR ${CMAKE_MATCH_1})
+            elseif(LINE MATCHES "^LAST_MONTH=([0-9]+)")
+                set(VERSION_MONTH ${CMAKE_MATCH_1})
+            elseif(LINE MATCHES "^BUILD_COUNT=([0-9]+)")
+                set(VERSION_BUILD ${CMAKE_MATCH_1})
+            endif()
+        endforeach()
+    endif()
+
+    # ★ 核心修复：无论是不是通过 build.sh 编译，只要是 Linux 环境，小版本号统统减 1
+    if(VERSION_BUILD GREATER 0)
+        math(EXPR VERSION_BUILD "${VERSION_BUILD} - 1")
+    endif()
+
+    # 自动获取编译时的年份（后两位）
+    string(TIMESTAMP VERSION_YEAR "%y")
+    
+    # 拼接版本号
+    set(APP_VERSION_STRING "${VERSION_MAJOR}.${VERSION_YEAR}.${VERSION_MONTH}.${VERSION_BUILD}")
+endif()
+
+message(STATUS "最终构建版本号: ${APP_VERSION_STRING}")
+
+# 注入到代码宏中
+target_compile_definitions(Vacuum_Music_Player_CMAKE PRIVATE
+    APP_VERSION_STRING="${APP_VERSION_STRING}"
+)
+
 # --- Link libraries ---
 target_link_libraries(Vacuum_Music_Player_CMAKE PRIVATE
     PkgConfig::TAGLIB
@@ -127,7 +170,6 @@ target_link_options(Vacuum_Music_Player_CMAKE PRIVATE
     -Wl,--no-as-needed
 )
 
-# --- CPack / .deb (Release + BUILD_DEB=ON only) ---
 if(BUILD_DEB)
     if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
         message(FATAL_ERROR
@@ -138,19 +180,44 @@ if(BUILD_DEB)
 
     message(STATUS "DEB packaging enabled")
 
-    # Install rules
-    install(TARGETS Vacuum_Music_Player_CMAKE
-            RUNTIME DESTINATION bin)
+    # 如果传递了版本号宏，使用它；否则兜底
+    if(NOT DEFINED APP_VERSION_STRING)
+        set(APP_VERSION_STRING "1.0.0")
+    endif()
 
-    # CPack metadata
+    # 将版本号写入编译宏
+    target_compile_definitions(Vacuum_Music_Player_CMAKE PRIVATE
+        APP_VERSION_STRING="${APP_VERSION_STRING}"
+    )
+
+    # 1. 安装可执行文件（只写这一次即可）
+    install(TARGETS Vacuum_Music_Player_CMAKE RUNTIME DESTINATION bin)
+
+    # 2. 安装 desktop 快捷方式
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/vacuum_music_player.desktop
+            DESTINATION share/applications)
+
+    # 3. 安装图标文件
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vacuum_music_player.png")
+        install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/vacuum_music_player.png
+                DESTINATION share/icons/hicolor/256x256/apps)
+    endif()
+
+    # --- CPack metadata ---
     set(CPACK_GENERATOR "DEB")
     set(CPACK_PACKAGE_NAME "vacuum-music-player")
-    set(CPACK_PACKAGE_VERSION "1.0.0")
+    
+    # ★ 修复 1：使用动态传进来的版本号
+    set(CPACK_PACKAGE_VERSION "${APP_VERSION_STRING}") 
+    
     set(CPACK_PACKAGE_CONTACT "lazymonkey666")
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-        "Vacuum Music Player - a music player for Raspberry Pi / Linux")
-    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "arm64")
-    set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Vacuum Music Player - a simple music player")
+    
+    # ★ 修复 2：自动识别当前系统的架构（在 WSL 下会是 amd64，在树莓派上会是 arm64）
+    execute_process(COMMAND dpkg --print-architecture OUTPUT_VARIABLE DEB_ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_ARCH}") 
+    
+    set(CPACK_DEBIAN_PACKAGE_SECTION "video") # 让它尽量归类到多媒体
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 
     include(CPack)

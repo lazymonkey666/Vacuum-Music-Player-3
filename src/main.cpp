@@ -221,6 +221,8 @@ static float g_albumArtFadeAlpha = 1.0f;            // 0.0 = 完全显示旧图,
 static bool g_isAlbumArtTransitioning = false;      // 是否正在播放动画
 static std::chrono::steady_clock::time_point g_albumArtTransStartTime;
 
+static float g_lyricsTargetY = 0.0f;   // 歌词滚动的目标 Y 坐标
+
 struct MusicMetadata {
     std::string title;
     std::string artist;
@@ -2899,6 +2901,9 @@ void RenderFrame(int counter,SettingWindow& settings) {
                     else
                         ImGui::PushFont(ImGui::GetFont()); // 后备字体
 
+                    // ★ 记录当前行的本地 Y 坐标（在画出来之前取）
+                    float itemY = ImGui::GetCursorPosY();
+
                     std::string uniqueLabel = g_lyrics[i].second + "##" + std::to_string(i);
                     if (SelectableWithStyle(uniqueLabel.c_str(), isCurrent, 6.0f))
                     {
@@ -2909,14 +2914,54 @@ void RenderFrame(int counter,SettingWindow& settings) {
                     // 关键：恢复字体
                     ImGui::PopFont();
 
-                    // 自动滚动逻辑
-                    if (isCurrent && g_needScrollToLyric && g_scrollBlockCounter == 0)
+                    // ★ 计算目标滚动位置
+                    if (isCurrent)
                     {
-                        ImGui::SetScrollHereY(0.5f);
-                        g_needScrollToLyric = false;
+                        // 只有在被允许滚动、或者刚切换歌曲/跳转时（g_needScrollToLyric），才更新目标
+                        if (g_scrollBlockCounter == 0)
+                        {
+                            float winHeight = ImGui::GetWindowHeight();
+                            // 居中公式：当前行Y - 窗口一半 + 当前行高度一半
+                            g_lyricsTargetY = itemY - winHeight * 0.5f + ImGui::GetTextLineHeight() * 0.5f;
+
+                            // 限制不能超过列表的有效滚动范围
+                            g_lyricsTargetY = std::clamp(g_lyricsTargetY, 0.0f, ImGui::GetScrollMaxY());
+
+                            g_needScrollToLyric = false;
+                        }
                     }
                 }
             }
+
+            // ★ 核心：使用指数平滑算法执行缓动
+            if (g_scrollBlockCounter == 0)
+            {
+                float currentScrollY = ImGui::GetScrollY();
+                float distance = g_lyricsTargetY - currentScrollY;
+
+                // 如果距离极微小，直接吸附，不需要渲染了
+                if (std::abs(distance) > 0.05f)
+                {
+                    // 这里的 10.0f 是平滑速度（Smooth Time），数值越大跟随越快
+                    // 1.0f - exp(-speed * dt) 是标准的帧率无关缓动公式，末期减速极其自然
+                    float alpha = 1.0f - std::exp(-10.0f * ImGui::GetIO().DeltaTime);
+
+                    float nextScrollY = currentScrollY + distance * alpha;
+
+                    // 如果逼近程度极度接近，强制贴合（但不用再跳变了，因为距离已经小于 0.05 了）
+                    if (std::abs(g_lyricsTargetY - nextScrollY) < 0.1f) {
+                        nextScrollY = g_lyricsTargetY;
+                    }
+
+                    ImGui::SetScrollY(nextScrollY);
+                }
+            }
+            else
+            {
+                // 用户滚轮时同步目标
+                g_lyricsTargetY = ImGui::GetScrollY();
+            }
+
             ImGui::EndListBox();
         }
     }

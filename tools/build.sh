@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 # build.sh - One-click build for Vacuum Music Player
 # Location: tools/build.sh
-# Usage:
-#   ./tools/build.sh           # interactive menu
-#   ./tools/build.sh release   # build Release binary
-#   ./tools/build.sh deb       # build Release + .deb package
-#   ./tools/build.sh clean     # remove build dirs
 
 set -euo pipefail
 
@@ -29,6 +24,47 @@ ok()   { echo "${GREEN}==>${NC} $*"; }
 warn() { echo "${YELLOW}==>${NC} $*"; }
 err()  { echo "${RED}==>${NC} $*" >&2; }
 
+# --- Version & Desktop Processing ---
+process_version_and_desktop() {
+    log "正在处理版本号与桌面快捷方式..."
+    
+        # 1. 读取 ver.config
+    local ver_file="${PROJECT_ROOT}/src/ver.config"
+    local v_major=3 v_month=0 v_build=0
+    
+    if [ -f "${ver_file}" ]; then
+        # 先清掉可能存在的 BOM 乱码
+        local clean_ver=$(sed 's/^\xEF\xBB\xBF//' "${ver_file}")
+        
+        v_major=$(echo "$clean_ver" | grep -oP '^MAJOR=\K[0-9]+' || echo 3)
+        v_month=$(echo "$clean_ver" | grep -oP '^LAST_MONTH=\K[0-9]+' || echo 10)
+        v_build=$(echo "$clean_ver" | grep -oP '^BUILD_COUNT=\K[0-9]+' || echo 7)
+        
+        v_build=$((v_build - 1))
+        if [ "$v_build" -lt 0 ]; then
+            v_build=0
+        fi
+    fi
+    # 2. 获取当前年份后两位
+    local v_year=$(date +%y)
+    export APP_VERSION_STRING="${v_major}.${v_year}.${v_month}.${v_build}"
+    log "最终构建版本号: ${APP_VERSION_STRING}"
+
+    # 3. 自动生成 .desktop 文件到 src 目录
+    local desktop_file="${PROJECT_ROOT}/src/vacuum_music_player.desktop"
+    cat > "${desktop_file}" << EOF
+[Desktop Entry]
+Type=Application
+Name=Vacuum Music Player
+Comment=A modern music player for Linux and Windows
+Exec=Vacuum_Music_Player_CMAKE
+Icon=vacuum_music_player
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+EOF
+    ok "已生成 Desktop 快捷方式: src/vacuum_music_player.desktop"
+}
+
 # --- Sanity checks ---
 check_env() {
     command -v cmake >/dev/null 2>&1 || { err "cmake not found"; exit 1; }
@@ -39,8 +75,13 @@ check_env() {
 # --- Release build ---
 build_release() {
     log "Building Release into ${BUILD_RELEASE_DIR}"
+    rm -rf "${BUILD_RELEASE_DIR}" # 清理旧缓存
+    
+    process_version_and_desktop
+
     cmake -S "${PROJECT_ROOT}" -B "${BUILD_RELEASE_DIR}" \
-        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_BUILD_TYPE=Release \
+        -DAPP_VERSION_STRING="${APP_VERSION_STRING}"
     cmake --build "${BUILD_RELEASE_DIR}" -j"${JOBS}"
     ok "Binary: ${BUILD_RELEASE_DIR}/bin/Vacuum_Music_Player_CMAKE"
 }
@@ -48,9 +89,14 @@ build_release() {
 # --- Deb build ---
 build_deb() {
     log "Building .deb into ${BUILD_DEB_DIR}"
+    rm -rf "${BUILD_DEB_DIR}" # 强制清理旧缓存
+    
+    process_version_and_desktop
+
     cmake -S "${PROJECT_ROOT}" -B "${BUILD_DEB_DIR}" \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_DEB=ON
+        -DBUILD_DEB=ON \
+        -DAPP_VERSION_STRING="${APP_VERSION_STRING}"
     cmake --build "${BUILD_DEB_DIR}" -j"${JOBS}" --target deb
 
     local deb
@@ -105,12 +151,10 @@ case "${1:-}" in
     ""|menu)       show_menu ;;
     -h|--help)
         echo "Usage: $0 [release|deb|clean]"
-        echo "  (no args)  interactive menu"
         exit 0
         ;;
     *)
         err "Unknown command: $1"
-        echo "Try: $0 --help"
         exit 1
         ;;
 esac

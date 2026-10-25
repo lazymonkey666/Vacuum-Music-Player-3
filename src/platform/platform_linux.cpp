@@ -352,8 +352,23 @@ bool CreateDeviceD3D(WindowHandle) { return true; }
 // ═══════════════════════════════════════════════════════════
 void InitSMTC(WindowHandle) {}
 void SetSMTCPlaybackStatus(PlaybackStatus) {}
-void UpdateSMTC(const std::string&, const std::string&, const std::string&, const std::vector<unsigned char>&) {}
-void UpdateSMTCProgress(uint64_t currentMs) {}
+void UpdateSMTC(const std::string& title,
+    const std::string& artist,
+    const std::string& album,
+    const std::vector<unsigned char>& cover,
+    uint64_t durationMs)
+{
+    // Linux 下暂时不需要实现 SMTC
+    (void)title;
+    (void)artist;
+    (void)album;
+    (void)cover;
+    (void)durationMs;
+}
+
+void UpdateSMTCProgress(uint64_t currentMs) {
+    (void)currentMs;
+}
 // ═══════════════════════════════════════════════════════════
 // 任务栏
 // ═══════════════════════════════════════════════════════════
@@ -720,10 +735,55 @@ std::vector<unsigned char> DecodeAndScaleImage(
 }
 std::vector<unsigned char> ConvertImageToJPEG(const std::vector<unsigned char>&) { return {}; }
 
-std::string GetFileVersionString() { return "1.0.0"; }
-TextureHandle LoadTextureFromResource(int, const wchar_t*, int*, int*) { return nullptr; }
-TextureHandle LoadAppIcon(int*, int*) { return nullptr; }
+std::string GetFileVersionString()
+{
+#ifdef APP_VERSION_STRING
+    return APP_VERSION_STRING;
+#else
+    return "未知版本";
+#endif
+}
+TextureHandle LoadTextureFromFile(const std::string& utf8Path) {
+    int w, h, channels;
+    // stb_image 加载图片
+    unsigned char* pixels = stbi_load(utf8Path.c_str(), &w, &h, &channels, 4);
+    if (!pixels) return nullptr;
 
+    std::vector<unsigned char> rgba(pixels, pixels + (w * h * 4));
+    stbi_image_free(pixels);
+
+    // 调用平台的纹理创建函数 (你在 Linux 下的 OpenGL 纹理创建)
+    return CreateTextureFromRGBA(rgba, w, h);
+}
+
+TextureHandle LoadTextureFromResource(int, const wchar_t*, int*, int*) { return nullptr; }
+TextureHandle LoadAppIcon(int* out_width, int* out_height) {
+    // 尝试多个可能的相对路径，防止运行目录不同导致找不到
+    std::string paths[] = {
+        "vacuum_music_player.png",
+        "resources/vacuum_music_player.png",
+        "../vacuum_music_player.png",
+        "../src/vacuum_music_player.png",
+        "src/vacuum_music_player.png"
+    };
+
+    for (const auto& p : paths) {
+        if (std::filesystem::exists(p)) {
+            TextureHandle tex = LoadTextureFromFile(p);
+            if (tex) {
+                OutputDebugStringA(("[LoadAppIcon] 成功加载图标: " + p + "\n").c_str());
+                // 因为我们没有在这里获取图片原始尺寸，默认写死宽高为 0
+                // SettingItemAbout 里的代码会自动按正方形（64x64）显示
+                if (out_width) *out_width = 0;
+                if (out_height) *out_height = 0;
+                return tex;
+            }
+        }
+    }
+
+    OutputDebugStringA("[LoadAppIcon] 找不到图标文件 vacuum_music_player.png\n");
+    return nullptr;
+}
 
 void RequestQuit() { PostMessage(g_hWnd, WM_CLOSE, 0, 0); }
 void RequestQuitProgram() { PostQuitMessage(0); }
@@ -1005,18 +1065,7 @@ bool ExtractZipFile(const std::string& zipPath, const std::string& destDir) {
     return std::system(cmd.c_str()) == 0;
 }
 
-TextureHandle LoadTextureFromFile(const std::string& utf8Path) {
-    int w, h, channels;
-    // stb_image 加载图片
-    unsigned char* pixels = stbi_load(utf8Path.c_str(), &w, &h, &channels, 4);
-    if (!pixels) return nullptr;
 
-    std::vector<unsigned char> rgba(pixels, pixels + (w * h * 4));
-    stbi_image_free(pixels);
-
-    // 调用平台的纹理创建函数 (你在 Linux 下的 OpenGL 纹理创建)
-    return CreateTextureFromRGBA(rgba, w, h);
-}
 
 std::string PickFileDialog(WindowHandle, const std::string& title, const std::string& filter) {
 	char buf[512]{};
