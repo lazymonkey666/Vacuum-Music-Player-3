@@ -134,7 +134,7 @@ void SettingWindow::render() {
         }
 
         std::string label = categories_[i].name;
-        if (isActive) label += ">";
+        if (isActive) label = " > " + label;
 
         if (ImGui::Selectable(label.c_str(), selectedCategory_ == i))
             selectedCategory_ = i;

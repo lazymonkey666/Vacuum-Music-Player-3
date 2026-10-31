@@ -10,9 +10,6 @@ license:GPL-3.0 license
 2026.4 Version 3 (CPP VERSION)
 */
 
-
-
-
 #define MINIAUDIO_IMPLEMENTATION
 
 #ifndef SPI_SETTHEMES
@@ -364,10 +361,17 @@ static bool g_IsSoundLoaded = false;
 
 static std::wstring coverPath;
 
-std::string GetCacheDirectory() {
-    std::string cacheDir = GetTempDir() + "Vacuum Music Player/MusicCache/";
-    std::filesystem::create_directories(std::filesystem::path(cacheDir));
-    return cacheDir;
+PathType GetCacheDirectory() {
+    // GetTempDir 现在返回 UTF-8
+    std::string tempUtf8 = GetTempDir();
+    std::string cacheUtf8 = tempUtf8 + "Vacuum Music Player/MusicCache/";
+
+    PathType cacheW = Utf8ToPath(cacheUtf8);
+    if (cacheW.empty()) return {};
+
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(cacheW), ec);
+    return cacheW;   // ✅ 宽字符
 }
 
 
@@ -572,17 +576,9 @@ std::string Base64Decode(const std::string& input) {
 }
 
 
-//bool WriteMp3Cover(const std::string& mp3Path, const std::string& imgPath)
-//{
-//    // 断点打在这里，刚进入函数
-//    std::string test1 = mp3Path;
-//    std::string test2 = imgPath;
-//
-//    // 下面所有TagLib、文件读写代码全部注释
-//    return true;
-//}
-
-
+// ═══════════════════════════════════════════════════════════════════
+// 写入音频元数据（标签 + 封面 + 歌词）
+// ═══════════════════════════════════════════════════════════════════
 void WriteMetadataToFile(const std::string& filePath,
     const std::string& title,
     const std::vector<std::string>& artist,
@@ -590,120 +586,156 @@ void WriteMetadataToFile(const std::string& filePath,
     const std::string& coverPath,
     const std::string& lyricsText = "")
 {
-    std::filesystem::path pathObj(filePath);
-    std::string ext = pathObj.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    // ── 1. 路径 → 原生类型（Windows: wstring，Linux: 原样 UTF-8 string）──
+    PathType fileW = Utf8ToPath(filePath);
+    if (fileW.empty()) {
+        OutputDebugStringA("[WriteMetadataToFile] filePath 转换失败\n");
+        return;
+    }
 
-    // ========== FLAC 分支 ==========
+    // ── 2. 扩展名：u8string() 输出 → 纯 ASCII 比较，不喂回 fs::path ──
+    std::string ext = u8string_to_string(
+        std::filesystem::path(fileW).extension().u8string());
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+        [](unsigned char c) { return (char)std::tolower(c); });
+
+    // ── 3. 艺术家拼接（多艺术家用 " & " 连接）──
+    std::string artistResult;
+    for (size_t i = 0; i < artist.size(); ++i) {
+        if (i > 0) artistResult += " & ";
+        artistResult += artist[i];
+    }
+    // 恢复flac封面写入
+    // ── 4. 预读封面（如果存在），避免下游两分支重复代码 ──
+    TagLib::ByteVector imgData;
+    std::string coverExt;
+    if (!coverPath.empty()) {
+        PathType coverW = Utf8ToPath(coverPath);
+        std::error_code ec;
+        if (!coverW.empty()
+            && std::filesystem::exists(coverW, ec) && !ec) {
+
+            std::ifstream imgFs(std::filesystem::path(coverW), std::ios::binary);
+            if (imgFs.is_open()) {
+                imgFs.seekg(0, std::ios::end);
+                const std::streamoff imgSize = imgFs.tellg();
+                if (imgSize > 0) {
+                    imgFs.seekg(0);
+                    std::vector<char> buf(static_cast<size_t>(imgSize));
+                    imgFs.read(buf.data(), imgSize);
+                    imgData = TagLib::ByteVector(buf.data(), buf.size());
+
+                    coverExt = u8string_to_string(
+                        std::filesystem::path(coverW).extension().u8string());
+                    std::transform(coverExt.begin(), coverExt.end(), coverExt.begin(),
+                        [](unsigned char c) { return (char)std::tolower(c); });
+                }
+                imgFs.close();
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FLAC 分支
+    // ═══════════════════════════════════════════════════════════════
     if (ext == ".flac") {
-        TagLib::FLAC::File file(filePath.c_str());
-        if (!file.isValid()) return;
-        auto* tag = file.xiphComment();
-        if (!tag) return;
+        TagLib::FLAC::File file(fileW.c_str());
+        if (!file.isValid()) {
+            OutputDebugStringA("[WriteMetadataToFile] FLAC 文件无效\n");
+            return;
+        }
+
+        // true = xiphComment 不存在时自动创建
+        auto* tag = file.xiphComment(true);
+        if (!tag) {
+            OutputDebugStringA("[WriteMetadataToFile] xiphComment 获取失败\n");
+            return;
+        }
+
+        // 只清空文本字段，封面单独处理
         tag->removeAllFields();
 
         tag->addField("TITLE", TagLib::String(title, TagLib::String::UTF8), true);
-        std::string artistResult;
-        for (size_t i = 0; i < artist.size(); ++i) {
-            if (i > 0) artistResult += " & ";
-            artistResult += artist[i];
-        }
         tag->addField("ARTIST", TagLib::String(artistResult, TagLib::String::UTF8), true);
         tag->addField("ALBUM", TagLib::String(album, TagLib::String::UTF8), true);
         if (!lyricsText.empty()) {
             tag->addField("LYRICS", TagLib::String(lyricsText, TagLib::String::UTF8), true);
         }
 
-        // 封面代码保持不变...
-        if (!coverPath.empty() && std::filesystem::exists(coverPath)) {
-            // ... 读取图片并写入
+        // 封面
+        if (!imgData.isEmpty()) {
+            file.removePictures();   // 清除已有全部封面
+
+            auto* pic = new TagLib::FLAC::Picture();
+            pic->setMimeType(coverExt == ".png" ? "image/png" : "image/jpeg");
+            pic->setType(TagLib::FLAC::Picture::FrontCover);
+            pic->setDescription("Album Cover");
+            pic->setData(imgData);
+            file.addPicture(pic);
         }
-        file.save();
+
+        if (!file.save()) {
+            OutputDebugStringA("[WriteMetadataToFile] FLAC 保存失败\n");
+        }
         return;
     }
 
-    // ========== 原有 MP3 逻辑（完全保持不变） ==========
-    // 仅当扩展名为 .mp3 或无扩展名时默认走这里（原有逻辑）
-    // 局部缓存路径，避免临时字符串野指针
-    const std::string localAudio = filePath;
-    const std::string localCover = coverPath;
-
-    TagLib::MPEG::File mpegFile(localAudio.c_str());
-    if (!mpegFile.isValid())
+    // ═══════════════════════════════════════════════════════════════
+    // MP3 分支（其他扩展名默认走这里）
+    // ═══════════════════════════════════════════════════════════════
+    TagLib::MPEG::File mpegFile(fileW.c_str());
+    if (!mpegFile.isValid()) {
+        OutputDebugStringA("[WriteMetadataToFile] MP3 文件无效\n");
         return;
+    }
 
+    // 通用基础标签（兼容 ID3v1 / ID3v2 通用层）
     TagLib::Tag* baseTag = mpegFile.tag();
-    if (baseTag)
-    {
+    if (baseTag) {
         baseTag->setTitle(TagLib::String(title, TagLib::String::UTF8));
-        std::string artistResult;
-        for (size_t i = 0; i < artist.size(); ++i)
-        {
-            if (i > 0) artistResult += " & ";
-            artistResult += artist [i];
-        }
         baseTag->setArtist(TagLib::String(artistResult, TagLib::String::UTF8));
         baseTag->setAlbum(TagLib::String(album, TagLib::String::UTF8));
     }
 
+    // ID3v2 详细标签
     TagLib::ID3v2::Tag* id3Tag = mpegFile.ID3v2Tag(true);
-    if (!id3Tag)
-        return;
-
-    std::ifstream imgFs(localCover, std::ios::binary);
-    if (!imgFs.is_open())
-        return;
-
-    imgFs.seekg(0, std::ios::end);
-    const std::streamoff imgSize = imgFs.tellg();
-    if (imgSize <= 0)
-    {
-        imgFs.close();
+    if (!id3Tag) {
+        OutputDebugStringA("[WriteMetadataToFile] ID3v2 Tag 创建失败\n");
         return;
     }
-    imgFs.seekg(0);
 
-    std::vector<char> imgBuffer(static_cast<size_t>(imgSize));
-    imgFs.read(imgBuffer.data(), imgSize);
-    imgFs.close();
-
-    TagLib::ByteVector imgData(imgBuffer.data(), imgBuffer.size());
-    if (imgData.isEmpty())
-        return;
-
-    auto apicFrames = id3Tag->frameListMap()["APIC"];
-    for (auto frame : apicFrames)
-        id3Tag->removeFrame(frame);
-
-    auto* picFrame = new TagLib::ID3v2::AttachedPictureFrame();
-    picFrame->setPicture(imgData);
-
-    std::string ext2;
-    if (localCover.length() >= 4)
-        ext2 = localCover.substr(localCover.length() - 4);
-    if (ext2 == ".png" || ext2 == ".PNG")
-        picFrame->setMimeType("image/png");
-    else
-        picFrame->setMimeType("image/jpeg");
-
-    picFrame->setType(TagLib::ID3v2::AttachedPictureFrame::FrontCover);
-    picFrame->setDescription("Album Cover");
-    id3Tag->addFrame(picFrame);
-
-    if (!lyricsText.empty())
-    {
-        auto usltFrames = id3Tag->frameListMap()["USLT"];
-        for (auto frame : usltFrames)
+    // 封面（APIC）
+    if (!imgData.isEmpty()) {
+        auto apicFrames = id3Tag->frameList("APIC");
+        for (auto* frame : apicFrames) {
             id3Tag->removeFrame(frame);
+        }
 
-        TagLib::ID3v2::UnsynchronizedLyricsFrame* lyricsFrame = new TagLib::ID3v2::UnsynchronizedLyricsFrame();
+        auto* picFrame = new TagLib::ID3v2::AttachedPictureFrame();
+        picFrame->setPicture(imgData);
+        picFrame->setMimeType(coverExt == ".png" ? "image/png" : "image/jpeg");
+        picFrame->setType(TagLib::ID3v2::AttachedPictureFrame::FrontCover);
+        picFrame->setDescription("Album Cover");
+        id3Tag->addFrame(picFrame);
+    }
+
+    // 歌词（USLT）
+    if (!lyricsText.empty()) {
+        auto usltFrames = id3Tag->frameList("USLT");
+        for (auto* frame : usltFrames) {
+            id3Tag->removeFrame(frame);
+        }
+
+        auto* lyricsFrame = new TagLib::ID3v2::UnsynchronizedLyricsFrame();
         lyricsFrame->setLanguage("chi");
         lyricsFrame->setDescription("");
         lyricsFrame->setText(TagLib::String(lyricsText, TagLib::String::UTF8));
         id3Tag->addFrame(lyricsFrame);
     }
 
-    mpegFile.save(TagLib::MPEG::File::AllTags);
+    if (!mpegFile.save(TagLib::MPEG::File::AllTags)) {
+        OutputDebugStringA("[WriteMetadataToFile] MP3 保存失败\n");
+    }
 }
 
 void UpdateImGuiStyle() {
@@ -859,29 +891,25 @@ void UpdateImGuiStyle() {
 
 
 //缓存相关
-uint64_t GetCacheSize(const std::string& cacheDir) {
+uint64_t GetCacheSize(const PathType& cacheDir) {
     uint64_t totalSize = 0;
     try {
         for (const auto& entry : std::filesystem::recursive_directory_iterator(cacheDir)) {
-            if (entry.is_regular_file()) {
-                totalSize += entry.file_size();
-            }
+            if (entry.is_regular_file()) totalSize += entry.file_size();
         }
     }
     catch (...) {}
     return totalSize;
 }
 
-// 按最后修改时间删除最旧的文件，直到总大小低于 limitBytes
-void TrimCache(const std::string& cacheDir, uint64_t limitBytes) {
+void TrimCache(const PathType& cacheDir, uint64_t limitBytes) {
     using FileInfo = std::pair<std::filesystem::file_time_type, std::filesystem::path>;
     std::priority_queue<FileInfo, std::vector<FileInfo>, std::greater<FileInfo>> oldestFirst;
 
     try {
         for (const auto& entry : std::filesystem::directory_iterator(cacheDir)) {
-            if (entry.is_regular_file()) {
+            if (entry.is_regular_file())
                 oldestFirst.emplace(entry.last_write_time(), entry.path());
-            }
         }
     }
     catch (...) { return; }
@@ -901,7 +929,7 @@ void TrimCache(const std::string& cacheDir, uint64_t limitBytes) {
 
 // 清理缓存（若大小超过上限）
 void EnforceCacheLimit(uint64_t limitMB) {
-    std::string cacheDir = GetCacheDirectory();
+    PathType cacheDir = GetCacheDirectory();
     if (cacheDir.empty()) return;
     uint64_t limitBytes = limitMB * 1024 * 1024;
     TrimCache(cacheDir, limitBytes);
@@ -1012,8 +1040,6 @@ std::string ExtractExtensionFromUrl(const std::string& url) {
 
 
 // 准备在线歌曲：下载、缓存、写入元数据，返回本地路径，失败返回空字符串
-
-
 void PlayLocalFile(const std::string& filepath_utf8) {
     PathType widePath = Utf8ToPath(filepath_utf8);
     if (widePath.empty()) return;
@@ -1032,11 +1058,13 @@ void PlayLocalFile(const std::string& filepath_utf8) {
             OutputDebugStringA(("播放失败: " + filepath_utf8 + "\n").c_str());
             return;
         }
+        IsPlaying = true;//迟来的代码
     }
     else {
         // Sonos 播放：提取纯文件名，丢给 HTTP 服务器
         std::string baseName = filepath_utf8.substr(filepath_utf8.find_last_of("/\\") + 1);
         g_sonos->PlayFile(baseName);
+        IsPlaying = true;
     }
 
     // ==========================================
@@ -1176,51 +1204,54 @@ void PlayLocalFile(const std::string& filepath_utf8) {
 
 // 返回空字符串代表失败，成功返回真实的本地绝对路径
 std::string DownloadAndProcessTrack(const PlaybackInfo& info) {
-    if (!info.isOnline) {
-        return info.audioUrl;
-    }
+    if (!info.isOnline) return info.audioUrl;
 
     std::string extension = (info.audioUrl.find(".flac") != std::string::npos) ? ".flac" : ".mp3";
-    std::string cacheDir = GetCacheDirectory();
-    std::string localPath = cacheDir + info.localCacheId + extension;
-    std::string imagePath = cacheDir + "temp_cover_" + info.localCacheId + ".jpg";
 
-    if (std::filesystem::exists(localPath) && std::filesystem::file_size(localPath) > 0) {
-        OutputDebugStringA(("使用缓存: " + localPath + "\n").c_str());
-        return localPath;
+    PathType cacheW = GetCacheDirectory();
+    if (cacheW.empty()) return "";
+
+    PathType localW = cacheW + Utf8ToPath(info.localCacheId + extension);
+    PathType imageW = cacheW + Utf8ToPath("temp_cover_" + info.localCacheId + ".jpg");
+
+    std::error_code ec;
+    if (std::filesystem::exists(localW, ec) && !ec
+        && std::filesystem::file_size(localW, ec) > 0 && !ec) {
+        std::string localUtf8 = PathToUtf8(localW);
+        OutputDebugStringA(("使用缓存: " + localUtf8 + "\n").c_str());
+        return localUtf8;
     }
 
+    // 下载函数接收 UTF-8（内部已改为 URLDownloadToFileW）
+    std::string localUtf8 = PathToUtf8(localW);
+    std::string imageUtf8 = PathToUtf8(imageW);
+
     SetStatus(STATUS_DOWNLOADING);
-    if (!DownloadFile(info.audioUrl, localPath)) {
+    if (!DownloadFile(info.audioUrl, localUtf8)) {
         OutputDebugStringA(("下载音频失败: " + info.audioUrl + "\n").c_str());
         return "";
     }
 
     if (info.needTags) {
         SetStatus(STATUS_FETCHING_META);
-        if (!info.albumArtUrl.empty()) {
-            DownloadFile(info.albumArtUrl, imagePath);
-        }
+        if (!info.albumArtUrl.empty()) DownloadFile(info.albumArtUrl, imageUtf8);
 
         SetStatus(STATUS_WRITING_TAGS);
 
-        // ★ 调用刚刚改好签名的函数，全部传字符串
-        std::vector<std::string> _artists = {};
-		_artists.push_back(info.artist);
-        if (std::filesystem::exists(imagePath)) {
-            WriteMetadataToFile(localPath, info.title, _artists, info.album, imagePath, info.lyrics);
-            std::filesystem::remove(imagePath);
+        std::vector<std::string> _artists = { info.artist };
+
+        std::error_code ec2;
+        if (std::filesystem::exists(imageW, ec2) && !ec2) {
+            WriteMetadataToFile(localUtf8, info.title, _artists, info.album, imageUtf8, info.lyrics);
+            std::filesystem::remove(imageW, ec2);
         }
         else {
-            WriteMetadataToFile(localPath, info.title, _artists, info.album, "", info.lyrics);
+            WriteMetadataToFile(localUtf8, info.title, _artists, info.album, "", info.lyrics);
         }
     }
 
-    if (g_cache_clean) {
-        EnforceCacheLimit(g_cache_limit_mb);
-    }
-
-    return localPath;
+    if (g_cache_clean) EnforceCacheLimit(g_cache_limit_mb);
+    return localUtf8;
 }
 
 void PlayMusicFile(int index) {
@@ -2369,35 +2400,7 @@ void RenderFrame(int counter,SettingWindow& settings) {
         // ========== 按钮栏（水平排列） =========
         int button_count = 6;
         float availWidth = ImGui::GetContentRegionAvail().x - (8.0f * (button_count - 1));
-        //        static TextureHandle playIcon = nullptr;
-        //        static TextureHandle pauseIcon = nullptr;
-        //        static TextureHandle hideIcon = nullptr;
-        //        static TextureHandle locateIcon = nullptr;
-        //        static TextureHandle orderIcon = nullptr;
-        //        static TextureHandle randomIcon = nullptr;
-        //        static TextureHandle roundIcon = nullptr;
 
-        //        if (!playIcon) {
-        //            playIcon = IconManager::GetInstance().LoadIcon("resources/play.svg", 16, 16, g_iconColor);
-        //        }
-        //        if (!pauseIcon) {
-        //            pauseIcon = IconManager::GetInstance().LoadIcon("resources/pause.svg", 16, 16, g_iconColor);
-        //        }
-        //        if (!hideIcon) {
-                    //hideIcon = IconManager::GetInstance().LoadIcon("resources/hide.svg", 16, 16, g_iconColor);
-        //        }
-        //        if (!locateIcon) {
-                    //locateIcon = IconManager::GetInstance().LoadIcon("resources/locate.svg", 16, 16, g_iconColor);
-        //        }
-        //        if (!orderIcon) {
-        //            orderIcon = IconManager::GetInstance().LoadIcon("resources/order.svg", 16, 16, g_iconColor);
-        //        }
-        //        if (!randomIcon) {
-        //            randomIcon = IconManager::GetInstance().LoadIcon("resources/random.svg", 16, 16, g_iconColor);
-        //        }
-        //        if (!roundIcon) {
-        //            roundIcon = IconManager::GetInstance().LoadIcon("resources/round.svg", 16, 16, g_iconColor);
-        //        }
         if (ImGui::ImageButton("prev_btn", (ImTextureID)GetIcon("prev"), ImVec2(16, 16))) {
             OnMediaPrev();
         }
@@ -2541,7 +2544,6 @@ void RenderFrame(int counter,SettingWindow& settings) {
                     }
                     else {
                         ImGui::Text("正在搜索... (请稍候)");
-                        // 可以加上旋转动画（略）
                     }
                 }
 
@@ -3377,9 +3379,7 @@ int main(int argc, char** argv) {
         g_sonos->Initialize();
     }
     srand(time(NULL));
-
-    MusicFiles = initMusicList();
-    if (MusicFiles.empty()) return 0;
+    initMusicList();
     if (!InitPlayerEngine()) return 1;
 
     InitUserCookie();
@@ -3401,7 +3401,6 @@ int main(int argc, char** argv) {
 
     UpdateCurrentPlaying(CurrentIndex);
     StartSearchSonos();
-    InitDisplayName();
 
     int counter = 0;
     MSG msg{};

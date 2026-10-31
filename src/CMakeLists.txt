@@ -47,7 +47,10 @@ set(APP_SOURCES
     ${PROJ_APP}/NeteaseAPIManager.cpp
     ${PROJ_APP}/ThemePack.cpp
     ${PROJ_APP}/platform/platform_linux.cpp
-    ${PROJ_APP}/platform/linux/LinuxThemeDetector.cpp)
+    ${PROJ_APP}/LocalSource.cpp
+    ${PROJ_APP}/NeteaseSource.cpp
+
+)
 
 # --- ImGui ---
 set(IMGUI_SOURCES

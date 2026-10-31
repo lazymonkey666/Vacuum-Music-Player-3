@@ -562,13 +562,28 @@ void StopWindowTimer(WindowHandle hWnd, uintptr_t timerId) {
 }
 
 std::string GetTempDir() {
-    char tempPath[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, tempPath) == 0) return {};
-    return std::string(tempPath);
+    // 用 W 版拿宽字符路径
+    wchar_t tempPath[MAX_PATH] = { 0 };
+    DWORD len = GetTempPathW(MAX_PATH, tempPath);
+    if (len == 0 || len > MAX_PATH) return {};
+
+    // 宽 → UTF-8
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, tempPath, (int)len,
+        nullptr, 0, nullptr, nullptr);
+    if (utf8Len <= 0) return {};
+
+    std::string result(utf8Len, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, tempPath, (int)len,
+        &result[0], utf8Len, nullptr, nullptr);
+    return result;   // ✅ UTF-8
 }
 
 bool DownloadFile(const std::string& url, const std::string& localPath) {
-    HRESULT hr = URLDownloadToFileA(NULL, url.c_str(), localPath.c_str(), 0, NULL);
+    PathType wUrl = Utf8ToPath(url);
+    PathType wPath = Utf8ToPath(localPath);
+    if (wUrl.empty() || wPath.empty()) return false;
+
+    HRESULT hr = URLDownloadToFileW(NULL, wUrl.c_str(), wPath.c_str(), 0, NULL);
     return SUCCEEDED(hr);
 }
 
@@ -872,7 +887,9 @@ void PrepareImGui() {
 
 // platform_windows.cpp
 void OpenUrlInBrowser(const std::string& url) {
-    ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    PathType wUrl = Utf8ToPath(url);
+    if (wUrl.empty()) return;
+    ShellExecuteW(NULL, L"open", wUrl.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
 // 辅助函数：使用 WIC 解码图片并缩放到指定尺寸，返回 RGBA 像素数据

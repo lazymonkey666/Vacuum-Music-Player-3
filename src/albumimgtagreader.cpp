@@ -293,24 +293,26 @@ std::string GetLyricsFromFile(const PathType& widePath) {
     }
     return "";
 }
-PathType FindLrcFile(const PathType& musicFilePath)
-{
+PathType FindLrcFile(const PathType& musicFilePath) {
     namespace fs = std::filesystem;
+    try {
+        fs::path p(musicFilePath);
+        // 全程用 fs::path 拼接，避免 string/wstring 混用
+        fs::path base = p.parent_path() / p.stem();
 
-    // 用宽字符串算路径，别让任何 char 掺和
-    PathType stem = musicFilePath;
-    size_t dot = stem.find_last_of(L'.');
-    if (dot != PathType::npos) stem = stem.substr(0, dot);
-
-    // 按优先级尝试的扩展名
-    const PathType exts[] = { L".lrc", L".LRC", L".txt" };
-    for (const auto& e : exts) {
-        fs::path candidate = stem + e;         // PathType + PathType → PathType
-        std::error_code ec;
-        if (fs::exists(candidate, ec) && !ec)
-            return candidate.wstring();
+        static const char* exts[] = { ".lrc", ".LRC", ".txt" };
+        for (auto ext : exts) {
+            fs::path candidate = base;
+            candidate += ext;   // 纯 ASCII 字面量，ACP 与 UTF-8 对 ASCII 完全一致，零风险
+            std::error_code ec;
+            if (fs::exists(candidate, ec) && !ec)
+                return candidate.native();   // Win: wstring；Linux: string
+        }
     }
-    return {};   // 没找到
+    catch (const std::exception& e) {
+        OutputDebugStringA(("[Lyrics] FindLrcFile error: " + std::string(e.what()) + "\n").c_str());
+    }
+    return {};
 }
 // ----------统一入口----------
 std::vector<unsigned char> ExtractAlbumArt(const PathType& filePath) {
