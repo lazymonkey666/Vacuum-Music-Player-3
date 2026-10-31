@@ -203,9 +203,11 @@
     <ClCompile Include="albumimgtagreader.cpp" />
     <ClCompile Include="AMLLWebSocketV2.cpp" />
     <ClCompile Include="IconManager.cpp" />
+    <ClCompile Include="LocalSource.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manageconfig.cpp" />
     <ClCompile Include="NeteaseAPIManager.cpp" />
+    <ClCompile Include="NeteaseSource.cpp" />
     <ClCompile Include="platform\platform_windows.cpp" />
     <ClCompile Include="SettingItem.cpp" />
     <ClCompile Include="SonosController.cpp" />
@@ -271,6 +273,7 @@
     <ClInclude Include="AMLLWebSocketV2.h" />
     <ClInclude Include="IconManager.h" />
     <ClInclude Include="manageconfig.h" />
+    <ClInclude Include="MusicSource.h" />
     <ClInclude Include="NeteaseAPIManager.h" />
     <ClInclude Include="platform\platform.h" />
     <ClInclude Include="resource.h" />

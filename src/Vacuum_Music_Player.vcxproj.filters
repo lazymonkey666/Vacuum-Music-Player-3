@@ -156,6 +156,12 @@
     <ClCompile Include="ThemePack.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="LocalSource.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="NeteaseSource.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="albumimgtagreader.h">
@@ -351,6 +357,9 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="..\third-party\zip_file.hpp">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MusicSource.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

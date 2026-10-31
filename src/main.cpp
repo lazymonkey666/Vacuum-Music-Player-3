@@ -56,6 +56,7 @@ license:GPL-3.0 license
 
 #include <IconManager.h>
 #include <ThemePack.h>
+#include <MusicSource.h>
 #include <iostream>
 
 #define HOTKEY_NEXT      1001
@@ -70,6 +71,8 @@ license:GPL-3.0 license
 #define WM_APP_SMTC_PREV   (WM_APP + 4)
 #define WM_UPDATE_ALBUM_ART   (WM_APP + 5)
 
+#define WM_FETCH_READY (WM_APP + 10)
+
 #define WM_USER_SOFTWARE_RESTART (WM_APP+100)
 
 #define WM_PLAY_READY  (WM_APP + 200)   // 播放准备就绪
@@ -78,13 +81,20 @@ license:GPL-3.0 license
 #define WM_SONOS_STOPPED (WM_APP + 300)
 
 
+// --- 播放源指针 ---
+static std::unique_ptr<IMusicSource> g_source = nullptr;
+struct AsyncFetchResult {
+    int taskId;
+    PlaybackInfo info;
+};
+
 static int CurrentIndex = -1;          // 当前播放歌曲在 MusicFiles 中的索引
 static float PlayProgressPercent = 0.0f;// 播放进度（百分比）
 static ma_uint64  PlayCurrentMs = 0;// 播放进度（时长）
 static float PlayMusicLong = 0.0f;      // 总时长
 static bool IsPlaying = false;         // 是否正在播放
 static ma_uint64 PlayMusicLongMs = 1;
-static std::vector<std::string> MusicFiles;
+//static std::vector<std::string> MusicFiles;
 static ma_uint64 g_TotalPCMFrames = 0; //音乐PCM总帧数
 static bool g_NeedScrollToCurrent = false;  // 滚动标志
 static int g_AsyncTaskId_search = 0;   // 统一的全局任务ID
@@ -145,7 +155,7 @@ static bool g_AMLL_connect = false;//播放状态
 
 static bool g_sonos_connect = false;//sonos连接状态
 
-static std::vector<std::string> only_music_file_name = {};
+//static std::vector<std::string> only_music_file_name = {}; //万年老数组 再见
 
 // 放在合适的作用域（例如 main 循环前，或者作为类的成员）
 static std::unique_ptr<SonosController> g_sonos;          // 全局控制器（只初始化一次）
@@ -160,7 +170,7 @@ static int g_opacity = 128;
 static std::string g_dark_mode = "System";
 static bool g_enableSnapToEdge = true;
 
-static std::string g_musicPath = "";
+//static std::string g_musicPath = "";
 
 static std::future<void> g_onlinePlayFuture;
 
@@ -185,14 +195,14 @@ static int g_normalWidth = 700;   // 窗口正常宽度，在窗口创建后赋�
 static int g_normalHeight = 230;  // 窗口正常高度
 
 static bool g_online_player = false;
-static std::vector<std::string> g_online_album_urls;
+//static std::vector<std::string> g_online_album_urls;
 static bool g_skip_vip = false;
 
 static bool g_bRenderSuspended = false;
 
 static bool g_netease_account_login_window_status = false;
 
-static std::string g_netease_user_cookie = "";
+std::string g_netease_user_cookie = "";
 
 static bool g_showLoginWindow = false;              // 控制登录窗口显示
 static char g_phoneInput[32] = "";                  // 手机号输入
@@ -222,6 +232,7 @@ static bool g_isAlbumArtTransitioning = false;      // 是否正在播放动画
 static std::chrono::steady_clock::time_point g_albumArtTransStartTime;
 
 static float g_lyricsTargetY = 0.0f;   // 歌词滚动的目标 Y 坐标
+
 
 struct MusicMetadata {
     std::string title;
@@ -258,7 +269,7 @@ enum StatusCode {
     STATUS_ERROR = -1
 };
 
-inline std::string u8string_to_string(const std::u8string& u8str) {
+std::string u8string_to_string(const std::u8string& u8str) {
     return std::string(reinterpret_cast<const char*>(u8str.data()), u8str.size());
 }
 
@@ -363,27 +374,8 @@ ImVec4 ConvertToImVec4(uint32_t color, bool hasAlpha = false) {
     return ImVec4(r, g, b, a);
 }
 
-void SaveLastMusic() {
-    if (MusicFiles.empty() || CurrentIndex < 0 || CurrentIndex >= (int)MusicFiles.size()) {
-        cfg.SetValue("last_music_local", "");
-        cfg.SetValue("last_music_online", "");
-        return;
-    }
-
-    if (g_online_player) {
-        cfg.SetValue("last_music_online", MusicFiles[CurrentIndex]);   // 存 ID
-        cfg.SetValue("last_music_local", "");                          // 清掉另一个模式的
-    }
-    else {
-        cfg.SetValue("last_music_local", MusicFiles[CurrentIndex]);    // 存路径
-        cfg.SetValue("last_music_online", "");
-    }
-    cfg.Save();
-}
-
 void SaveAndRestart() {
     // 保存当前播放的歌曲
-    SaveLastMusic();
     cfg.Save();
 #if PLATFORM_LINUX
     ReleaseSingleInstanceLock(); 
@@ -585,7 +577,12 @@ std::string Base64Decode(const std::string& input) {
 //}
 
 
-void WriteMetadataToFile(const std::string& filePath, const NeteaseSongInfo& info, const std::string& coverPath, const std::string& lyricsText = "")
+void WriteMetadataToFile(const std::string& filePath,
+    const std::string& title,
+    const std::vector<std::string>& artist,
+    const std::string& album,
+    const std::string& coverPath,
+    const std::string& lyricsText = "")
 {
     std::filesystem::path pathObj(filePath);
     std::string ext = pathObj.extension().string();
@@ -599,14 +596,14 @@ void WriteMetadataToFile(const std::string& filePath, const NeteaseSongInfo& inf
         if (!tag) return;
         tag->removeAllFields();
 
-        tag->addField("TITLE", TagLib::String(info.name, TagLib::String::UTF8), true);
+        tag->addField("TITLE", TagLib::String(title, TagLib::String::UTF8), true);
         std::string artistResult;
-        for (size_t i = 0; i < info.artists.size(); ++i) {
+        for (size_t i = 0; i < artist.size(); ++i) {
             if (i > 0) artistResult += " & ";
-            artistResult += info.artists[i];
+            artistResult += artist[i];
         }
         tag->addField("ARTIST", TagLib::String(artistResult, TagLib::String::UTF8), true);
-        tag->addField("ALBUM", TagLib::String(info.album, TagLib::String::UTF8), true);
+        tag->addField("ALBUM", TagLib::String(album, TagLib::String::UTF8), true);
         if (!lyricsText.empty()) {
             tag->addField("LYRICS", TagLib::String(lyricsText, TagLib::String::UTF8), true);
         }
@@ -632,15 +629,15 @@ void WriteMetadataToFile(const std::string& filePath, const NeteaseSongInfo& inf
     TagLib::Tag* baseTag = mpegFile.tag();
     if (baseTag)
     {
-        baseTag->setTitle(TagLib::String(info.name, TagLib::String::UTF8));
+        baseTag->setTitle(TagLib::String(title, TagLib::String::UTF8));
         std::string artistResult;
-        for (size_t i = 0; i < info.artists.size(); ++i)
+        for (size_t i = 0; i < artist.size(); ++i)
         {
             if (i > 0) artistResult += " & ";
-            artistResult += info.artists[i];
+            artistResult += artist [i];
         }
         baseTag->setArtist(TagLib::String(artistResult, TagLib::String::UTF8));
-        baseTag->setAlbum(TagLib::String(info.album, TagLib::String::UTF8));
+        baseTag->setAlbum(TagLib::String(album, TagLib::String::UTF8));
     }
 
     TagLib::ID3v2::Tag* id3Tag = mpegFile.ID3v2Tag(true);
@@ -1011,29 +1008,34 @@ std::string ExtractExtensionFromUrl(const std::string& url) {
 // 准备在线歌曲：下载、缓存、写入元数据，返回本地路径，失败返回空字符串
 
 
-void PlayLocalFile(const std::string filepath_utf8) {
+void PlayLocalFile(const std::string& filepath_utf8) {
     PathType widePath = Utf8ToPath(filepath_utf8);
     if (widePath.empty()) return;
-    TextureHandle oldArt = MusicMeta.albumArtSRV;//覆盖结构体
+
+    // 保留旧封面句柄，重置元数据
+    TextureHandle oldArt = MusicMeta.albumArtSRV;
     MusicMeta = GetMusicMetadata(filepath_utf8);
     MusicMeta.albumArtSRV = oldArt;
+
+    // ==========================================
+    // 1. 播放音频引擎 (MiniAudio 或 Sonos)
+    // ==========================================
     if (!g_sonos_connect) {
-        // 使用流式加载（streaming）以降低内存占用，适用于本地播放大文件
+        // 本地播放
         if (MA_SOUND_INIT_FROM_FILE(&g_AudioEngine, widePath.c_str(), MA_SOUND_FLAG_STREAM, NULL, NULL, &g_CurrentSound) != MA_SUCCESS) {
             OutputDebugStringA(("播放失败: " + filepath_utf8 + "\n").c_str());
             return;
         }
     }
     else {
-        if (!g_online_player) {
-            g_sonos->PlayFile(only_music_file_name[CurrentIndex]);
-        }
-        else {
-            std::string online_play_path=filepath_utf8.substr(filepath_utf8.find_last_of("/\\") + 1);
-            g_sonos->PlayFile(online_play_path);
-        }
+        // Sonos 播放：提取纯文件名，丢给 HTTP 服务器
+        std::string baseName = filepath_utf8.substr(filepath_utf8.find_last_of("/\\") + 1);
+        g_sonos->PlayFile(baseName);
     }
 
+    // ==========================================
+    // 2. 获取时长
+    // ==========================================
     float totalSec = 0.0f;
     if (!g_sonos_connect) {
         if (ma_sound_get_length_in_seconds(&g_CurrentSound, &totalSec) == MA_SUCCESS) {
@@ -1049,100 +1051,81 @@ void PlayLocalFile(const std::string filepath_utf8) {
         }
     }
     else {
-        /*老版本：使用sonos音响获取音频时长（不太稳定，短音频不好用）
-        PlayMusicLongMs=g_sonos->GetSonosTrackDuration();
-        OutputDebugStringA(std::to_string(PlayMusicLongMs).c_str());
-        新版本：使用ma_decoder直接获得本地音频的内容
-        */
-        bool a = g_sonos->GetPlayer()->SetPlayMode(SONOS::PlayMode_NORMAL);
+        g_sonos->GetPlayer()->SetPlayMode(SONOS::PlayMode_NORMAL);
         PlayMusicLongMs = GetAudioFileDurationMs(filepath_utf8);
-        //需要设置音频的播放模式为顺序播放不循环的才行：
-
     }
+
+    // ==========================================
+    // 3. 解析歌词
+    // ==========================================
     g_lyrics.clear();
     g_currentLyricIndex = -1;
     g_needScrollToLyric = false;
     std::string orginal_lrc = "Unknow";
-    // 1. 尝试从 ID3 标签读取歌词
+
     std::string id3Lyrics = GetLyricsFromFile(widePath);
     if (!id3Lyrics.empty()) {
         g_lyrics = ParseLrc(id3Lyrics);
         orginal_lrc = id3Lyrics;
     }
     else {
-        // 2. 查找 .lrc 文件（同目录或子目录）
         PathType lrcPath = FindLrcFile(widePath);
         if (!lrcPath.empty()) {
             std::string content = ReadTextFile(lrcPath);
             if (!content.empty()) {
-                // 移除 UTF-8 BOM
                 if (content.size() >= 3 && (unsigned char)content[0] == 0xEF
                     && (unsigned char)content[1] == 0xBB && (unsigned char)content[2] == 0xBF) {
                     content = content.substr(3);
                 }
                 g_lyrics = ParseLrc(content);
                 orginal_lrc = content;
-                OutputDebugStringA(("Loaded lyrics, lines: " + std::to_string(g_lyrics.size()) + "\n").c_str());
             }
-            else {
-                OutputDebugStringA("Failed to open lyrics file.\n");
-            }
-        }
-        else {
-            OutputDebugStringA("No lyrics found.\n");
         }
     }
-    // 提取原始封面数据
-    std::vector<unsigned char> rawAlbumData = ExtractAlbumArt(widePath);
 
-    // 记录当前索引（用于防止异步回调覆盖新播放的歌曲）
+    // ==========================================
+    // 4. 提取封面数据并处理 SMTC
+    // ==========================================
+    std::vector<unsigned char> rawAlbumData = ExtractAlbumArt(widePath);
     int currentTaskId = ++g_AsyncTaskId_search;
-    // 1. 先准备要发送给 AMLL 的封面数据（JPEG 或原始格式）
+
     std::vector<unsigned char> amllCoverData;
     if (!rawAlbumData.empty()) {
-        // 尝试转换为 JPEG（与 SMTC 保持一致）
         amllCoverData = ConvertImageToJPEG(rawAlbumData);
         if (amllCoverData.empty()) {
-            // 转换失败，使用原始数据
             amllCoverData = rawAlbumData;
         }
-    }
 
-    // 2. 处理 SMTC（使用同样的 JPEG 或原始数据）
-    if (!rawAlbumData.empty()) {
         std::vector<unsigned char> jpegData = ConvertImageToJPEG(rawAlbumData);
         if (!jpegData.empty()) {
-            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, jpegData,PlayMusicLongMs);
+            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, jpegData, PlayMusicLongMs);
         }
         else {
             UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, rawAlbumData, PlayMusicLongMs);
         }
     }
+    else {
+        UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, {}, PlayMusicLongMs);
+    }
 
-    // 3. 异步任务处理 UI 封面（需要深拷贝，不能用 move）
+    // ==========================================
+    // 5. 异步处理 UI 封面 (带淡入淡出)
+    // ==========================================
     if (!rawAlbumData.empty()) {
         OutputDebugStringA(("[PlayLocalFile] raw album art size=" + std::to_string(rawAlbumData.size()) + "\n").c_str());
         std::string title = MusicMeta.title;
         std::string artist = MusicMeta.artist;
         std::string album = MusicMeta.album;
-        std::vector<unsigned char> rawDataCopy = rawAlbumData;  // 拷贝一份，不是 move
+        std::vector<unsigned char> rawDataCopy = rawAlbumData;
 
-        // ★ 改成 std::thread 并 detach
         std::thread([rawDataCopy, title, artist, album, currentTaskId]() {
-            // 1. 检查是否已经切歌（过期任务直接退出，不浪费 CPU）
             if (currentTaskId != g_AsyncTaskId_search) return;
 
-            // 2. 处理封面
             std::vector<unsigned char> processedForUI = ProcessAlbumArtWithGradient(rawDataCopy, 230, 230);
-            if (processedForUI.empty()) {
-                OutputDebugStringA("ProcessAlbumArtWithGradient failed\n");
-                return;
-            }
+            if (processedForUI.empty()) return;
 
-            // 3. 再次检查（因为处理图片可能耗时，处理完可能用户已经切歌了）
             if (currentTaskId != g_AsyncTaskId_search) return;
 
-            // 4. 封装数据并发送给主线程
             AlbumArtAsyncResult* result = new AlbumArtAsyncResult();
             result->width = 230;
             result->height = 230;
@@ -1153,19 +1136,24 @@ void PlayLocalFile(const std::string filepath_utf8) {
             result->album = album;
             result->targetIndex = currentTaskId;
             PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(result));
-            }).detach(); // ★ 彻底分离，主线程绝对不卡
+            }).detach();
     }
     else {
-        // 没有封面，发一个空结果给主线程触发淡出动画
         AlbumArtAsyncResult* emptyResult = new AlbumArtAsyncResult();
         emptyResult->targetIndex = currentTaskId;
         PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(emptyResult));
     }
 
-    // 4. 发送 AMLL 消息（使用提前准备好的 amllCoverData）
+    // ==========================================
+    // 6. 启动播放并发送 AMLL 消息
+    // ==========================================
     SetSMTCPlaybackStatus(PlaybackStatus::Playing);
-    ma_sound_start(&g_CurrentSound);
-    if (!(g_sonos_connect)) { g_IsSoundLoaded = true; }
+
+    if (!g_sonos_connect) {
+        ma_sound_start(&g_CurrentSound);
+        g_IsSoundLoaded = true;
+    }
+
     std::string id1 = "t0";
     std::string id2 = "al0";
     std::string id3 = "ar0";
@@ -1176,12 +1164,62 @@ void PlayLocalFile(const std::string filepath_utf8) {
             std::string jpegUriData = amllplayer->imageToDataURI(amllCoverData, "image/jpeg");
             amllplayer->sendAlbumCoverByURI(jpegUriData);
         }
-
-        amllplayer->sendLyricFromLRC(orginal_lrc,g_enable_lyric_translate_split); //有开关
+        amllplayer->sendLyricFromLRC(orginal_lrc, g_enable_lyric_translate_split);
     }
 }
 
-void PlayMusicFile(const std::string& filepath_utf8) {
+// 返回空字符串代表失败，成功返回真实的本地绝对路径
+std::string DownloadAndProcessTrack(const PlaybackInfo& info) {
+    if (!info.isOnline) {
+        return info.audioUrl;
+    }
+
+    std::string extension = (info.audioUrl.find(".flac") != std::string::npos) ? ".flac" : ".mp3";
+    std::string cacheDir = GetCacheDirectory();
+    std::string localPath = cacheDir + info.localCacheId + extension;
+    std::string imagePath = cacheDir + "temp_cover_" + info.localCacheId + ".jpg";
+
+    if (std::filesystem::exists(localPath) && std::filesystem::file_size(localPath) > 0) {
+        OutputDebugStringA(("使用缓存: " + localPath + "\n").c_str());
+        return localPath;
+    }
+
+    SetStatus(STATUS_DOWNLOADING);
+    if (!DownloadFile(info.audioUrl, localPath)) {
+        OutputDebugStringA(("下载音频失败: " + info.audioUrl + "\n").c_str());
+        return "";
+    }
+
+    if (info.needTags) {
+        SetStatus(STATUS_FETCHING_META);
+        if (!info.albumArtUrl.empty()) {
+            DownloadFile(info.albumArtUrl, imagePath);
+        }
+
+        SetStatus(STATUS_WRITING_TAGS);
+
+        // ★ 调用刚刚改好签名的函数，全部传字符串
+        std::vector<std::string> _artists = {};
+		_artists.push_back(info.artist);
+        if (std::filesystem::exists(imagePath)) {
+            WriteMetadataToFile(localPath, info.title, _artists, info.album, imagePath, info.lyrics);
+            std::filesystem::remove(imagePath);
+        }
+        else {
+            WriteMetadataToFile(localPath, info.title, _artists, info.album, "", info.lyrics);
+        }
+    }
+
+    if (g_cache_clean) {
+        EnforceCacheLimit(g_cache_limit_mb);
+    }
+
+    return localPath;
+}
+
+void PlayMusicFile(int index) {
+    if (!g_source || index < 0 || index >= (int)g_source->GetCount()) return;
+
     g_loading_music = true;
     SetStatus(STATUS_FETCHING_URL);
 
@@ -1192,181 +1230,177 @@ void PlayMusicFile(const std::string& filepath_utf8) {
     }
     g_scrollBlockCounter = 0;
 
-    if (!g_online_player) {
-        PlayLocalFile(filepath_utf8);
-        g_loading_music = false;
-        return;
-    }
+    CurrentIndex = index;
+    g_source->SaveIndex(index);
 
     int currentTaskId = ++g_AsyncTaskId_download;
-    int idx = CurrentIndex;
-    std::string cookieCopy = g_netease_user_cookie;
 
-    // ★ 终极修复：改用 std::thread 彻底分离，主线程绝不等待！
-    std::thread([filepath_utf8, currentTaskId, idx, cookieCopy]() {
+    std::thread([index, currentTaskId]() {
+        // 1. 获取信息
+        PlaybackInfo info = g_source->PreparePlayback(index);
+
+        if (currentTaskId != g_AsyncTaskId_download) return;
+
+        if (!info.isValid) {
+            AsyncPlayResult errorRes;
+            errorRes.taskId = currentTaskId;
+            errorRes.success = false;
+            errorRes.errorMsg = "获取播放信息失败";
+            PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(errorRes));
+            return;
+        }
+
+        // 2. 统一下载（本地直接返回路径，在线下载+打标签）
+        std::string finalLocalPath = DownloadAndProcessTrack(info);
+
+        if (currentTaskId != g_AsyncTaskId_download) return;
+
+        // 3. 通知主线程播放
         AsyncPlayResult result;
         result.taskId = currentTaskId;
-        result.index = idx;
-        result.success = false;
-        result.localPath = "";
-
-        try {
-            // 3.1 获取播放 URL
-            std::string playUrl = NeteaseAPIManager::GetInstance().GetSongUrl(filepath_utf8, "exhigh", cookieCopy);
-
-            // ★ 如果在请求 URL 的时候用户已经切歌，直接放弃，别下载了
-            if (currentTaskId != g_AsyncTaskId_download) return;
-
-            if (playUrl.empty()) {
-                result.errorMsg = "获取播放 URL 失败";
-                PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
-                return;
-            }
-            std::string extension = ".mp3";
-            if (ExtractExtensionFromUrl(playUrl) == ".flac") {
-                extension = ".flac";
-            }
-
-            // 3.2 缓存路径
-            SetStatus(STATUS_DOWNLOADING);
-            std::string cacheDir = GetCacheDirectory();
-            std::string localPath = cacheDir + filepath_utf8 + extension;
-            std::string imagePath = cacheDir + "temp_cover_" + filepath_utf8 + ".jpg";
-
-            // 3.3 如果已缓存且有效，直接使用
-            if (std::filesystem::exists(localPath) && std::filesystem::file_size(localPath) > 0) {
-                OutputDebugStringA(("使用缓存: " + localPath + "\n").c_str());
-                result.localPath = localPath;
-                result.success = true;
-                PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
-                return;
-            }
-
-            // 3.4 下载 MP3
-            if (!DownloadFile(playUrl, localPath)) {
-                result.errorMsg = "下载 MP3 失败";
-                PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
-                return;
-            }
-
-            // ★ 下载完歌曲后，再检查一次是否被切歌
-            if (currentTaskId != g_AsyncTaskId_download) return;
-
-            // 3.5 下载封面
-            std::string coverUrl = g_online_album_urls[idx];
-            if (!coverUrl.empty()) {
-                if (!DownloadFile(coverUrl, imagePath)) {
-                    OutputDebugStringA(("下载封面失败: " + coverUrl + "\n").c_str());
-                }
-            }
-            if (g_cache_clean) {
-                EnforceCacheLimit(g_cache_limit_mb);
-            }
-            SetStatus(STATUS_FETCHING_META);
-
-            // 3.6 获取歌词
-            std::string lyrics = NeteaseAPIManager::GetInstance().GetLyrics(filepath_utf8);
-
-            // ★ 获取歌词后，再检查一次
-            if (currentTaskId != g_AsyncTaskId_download) return;
-
-            // 3.7 获取歌曲完整信息
-            NeteaseSongInfo info = NeteaseAPIManager::GetInstance().GetSongFullInfo(filepath_utf8);
-
-            SetStatus(STATUS_WRITING_TAGS);
-
-            // 3.8 写入元数据
-            if (std::filesystem::exists(imagePath)) {
-                WriteMetadataToFile(localPath, info, imagePath, lyrics);
-                std::filesystem::remove(imagePath);
-            }
-            else {
-                WriteMetadataToFile(localPath, info, "", lyrics);
-            }
-
-            result.localPath = localPath;
-            result.success = true;
-            PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
-
-        }
-        catch (const std::exception& e) {
-            result.errorMsg = e.what();
+        result.index = index;
+        if (finalLocalPath.empty()) {
+            result.success = false;
+            result.errorMsg = "下载或处理失败";
             PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
         }
-        }).detach(); // ★ 彻底分离，瞬间返回
-
-    OutputDebugStringA(("正在播放: " + filepath_utf8 + "\n").c_str());
-}
-
-
-void UpdateCurrentPlaying(int new_index) {//调用此函数以播放音乐，不要直接调用PlayMusicFile
-    if (new_index < 0 || new_index >= (int)MusicFiles.size()) {
-        CurrentIndex = 0;
-        IsPlaying = true;
-    }
-    else { CurrentIndex = new_index; }
-    // 播放该歌曲
-    PlayMusicFile(MusicFiles[CurrentIndex]);
-    IsPlaying = true;
-}
-
-
-std::vector<std::string> GetMusicFiles(const std::string& directory_utf8) {
-    struct FileInfo {
-        std::string path;
-        std::filesystem::file_time_type last_write;
-    };
-    std::vector<FileInfo> temp;
-
-    PathType dirPath = Utf8ToPath(directory_utf8);
-    if (dirPath.empty()) return {};
-
-    // 判断扩展名（跨平台）
-    auto hasMusicExt = [](const std::filesystem::path& p) {
-        std::string ext = p.extension().string();
-        for (auto& c : ext) c = (char)std::tolower((unsigned char)c);
-        return ext == ".mp3" || ext == ".flac" || ext == ".wav";
-        };
-
-    try {
-        bool recursive = false;
-        try {
-            recursive = ManageConfig::GetInstance().GetValue<bool>("recursive_scan", false);
-        }
-        catch (...) { recursive = false; }
-
-        if (recursive) {
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(dirPath)) {
-                if (!entry.is_regular_file()) continue;
-                if (!hasMusicExt(entry.path())) continue;
-
-                std::string absPath = u8string_to_string(entry.path().u8string());
-                std::replace(absPath.begin(), absPath.end(), '\\', '/');
-                temp.emplace_back(FileInfo{ std::move(absPath), entry.last_write_time() });
-            }
-        }
         else {
-            for (const auto& entry : std::filesystem::directory_iterator(dirPath)) {
-                if (!entry.is_regular_file()) continue;
-                if (!hasMusicExt(entry.path())) continue;
-
-                std::string absPath = u8string_to_string(entry.path().u8string());
-                std::replace(absPath.begin(), absPath.end(), '\\', '/');
-                temp.emplace_back(FileInfo{ std::move(absPath), entry.last_write_time() });
-            }
+            result.success = true;
+            result.localPath = finalLocalPath;
+            PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
         }
-    }
-    catch (const std::filesystem::filesystem_error& e) {
-        OutputDebugStringA(("文件系统错误: " + std::string(e.what()) + "\n").c_str());
-    }
+        }).detach();
+}
 
-    std::sort(temp.begin(), temp.end(),
-        [](const FileInfo& a, const FileInfo& b) { return a.last_write > b.last_write; });
+//void PlayMusicFile(const std::string& filepath_utf8) {
+//    g_loading_music = true;
+//    SetStatus(STATUS_FETCHING_URL);
+//
+//    if (g_IsSoundLoaded) {
+//        ma_sound_stop(&g_CurrentSound);
+//        ma_sound_uninit(&g_CurrentSound);
+//        g_IsSoundLoaded = false;
+//    }
+//    g_scrollBlockCounter = 0;
+//
+//    if (!g_online_player) {
+//        PlayLocalFile(filepath_utf8);
+//        g_loading_music = false;
+//        return;
+//    }
+//
+//    int currentTaskId = ++g_AsyncTaskId_download;
+//    int idx = CurrentIndex;
+//    std::string cookieCopy = g_netease_user_cookie;
+//
+//    // ★ 终极修复：改用 std::thread 彻底分离，主线程绝不等待！
+//    std::thread([filepath_utf8, currentTaskId, idx, cookieCopy]() {
+//        AsyncPlayResult result;
+//        result.taskId = currentTaskId;
+//        result.index = idx;
+//        result.success = false;
+//        result.localPath = "";
+//
+//        try {
+//            // 3.1 获取播放 URL
+//            std::string playUrl = NeteaseAPIManager::GetInstance().GetSongUrl(filepath_utf8, "exhigh", cookieCopy);
+//
+//            // ★ 如果在请求 URL 的时候用户已经切歌，直接放弃，别下载了
+//            if (currentTaskId != g_AsyncTaskId_download) return;
+//
+//            if (playUrl.empty()) {
+//                result.errorMsg = "获取播放 URL 失败";
+//                PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
+//                return;
+//            }
+//            std::string extension = ".mp3";
+//            if (ExtractExtensionFromUrl(playUrl) == ".flac") {
+//                extension = ".flac";
+//            }
+//
+//            // 3.2 缓存路径
+//            SetStatus(STATUS_DOWNLOADING);
+//            std::string cacheDir = GetCacheDirectory();
+//            std::string localPath = cacheDir + filepath_utf8 + extension;
+//            std::string imagePath = cacheDir + "temp_cover_" + filepath_utf8 + ".jpg";
+//
+//            // 3.3 如果已缓存且有效，直接使用
+//            if (std::filesystem::exists(localPath) && std::filesystem::file_size(localPath) > 0) {
+//                OutputDebugStringA(("使用缓存: " + localPath + "\n").c_str());
+//                result.localPath = localPath;
+//                result.success = true;
+//                PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
+//                return;
+//            }
+//
+//            // 3.4 下载 MP3
+//            if (!DownloadFile(playUrl, localPath)) {
+//                result.errorMsg = "下载 MP3 失败";
+//                PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
+//                return;
+//            }
+//
+//            // ★ 下载完歌曲后，再检查一次是否被切歌
+//            if (currentTaskId != g_AsyncTaskId_download) return;
+//
+//            // 3.5 下载封面
+//            std::string coverUrl = g_online_album_urls[idx];
+//            if (!coverUrl.empty()) {
+//                if (!DownloadFile(coverUrl, imagePath)) {
+//                    OutputDebugStringA(("下载封面失败: " + coverUrl + "\n").c_str());
+//                }
+//            }
+//            if (g_cache_clean) {
+//                EnforceCacheLimit(g_cache_limit_mb);
+//            }
+//            SetStatus(STATUS_FETCHING_META);
+//
+//            // 3.6 获取歌词
+//            std::string lyrics = NeteaseAPIManager::GetInstance().GetLyrics(filepath_utf8);
+//
+//            // ★ 获取歌词后，再检查一次
+//            if (currentTaskId != g_AsyncTaskId_download) return;
+//
+//            // 3.7 获取歌曲完整信息
+//            NeteaseSongInfo info = NeteaseAPIManager::GetInstance().GetSongFullInfo(filepath_utf8);
+//
+//            SetStatus(STATUS_WRITING_TAGS);
+//
+//            // 3.8 写入元数据
+//            if (std::filesystem::exists(imagePath)) {
+//                WriteMetadataToFile(localPath, info, imagePath, lyrics);
+//                std::filesystem::remove(imagePath);
+//            }
+//            else {
+//                WriteMetadataToFile(localPath, info, "", lyrics);
+//            }
+//
+//            result.localPath = localPath;
+//            result.success = true;
+//            PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
+//
+//        }
+//        catch (const std::exception& e) {
+//            result.errorMsg = e.what();
+//            PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
+//        }
+//        }).detach(); // ★ 彻底分离，瞬间返回
+//
+//    OutputDebugStringA(("正在播放: " + filepath_utf8 + "\n").c_str());
+//}
 
-    std::vector<std::string> result;
-    result.reserve(temp.size());
-    for (auto& info : temp) result.push_back(std::move(info.path));
-    return result;
+
+void UpdateCurrentPlaying(int new_index) {
+    if (!g_source || g_source->GetCount() == 0) return;
+
+    if (new_index < 0 || new_index >= (int)g_source->GetCount()) {
+        CurrentIndex = 0;
+    }
+    else {
+        CurrentIndex = new_index;
+    }
+    PlayMusicFile(CurrentIndex);
+    IsPlaying = true;
 }
 
 void StopAnimation() {
@@ -1387,126 +1421,28 @@ void StopAnimation() {
     }
 }
 
-std::vector<std::string> initMusicList() {
-    std::vector<std::string>  musicFiles = {};
-    if (!g_online_player) {
-        // 1. 读取配置中的路径并去除首尾空白
-        std::string musicPath = cfg.GetValue<std::string>("music_folder", "");
-        musicPath.erase(0, musicPath.find_first_not_of(" \t\r\n"));
-        musicPath.erase(musicPath.find_last_not_of(" \t\r\n") + 1);
-
-        // 改
-        PathType wpath = Utf8ToPath(musicPath);
-
-        bool pathValid = !musicPath.empty()
-            && std::filesystem::exists(wpath)
-            && std::filesystem::is_directory(wpath);
-        if (!pathValid) {
-            musicPath = PickFolderDialog(g_hWnd);
-            if (musicPath.empty()) {
-                ShowMessageBox("提示", "未配置音乐文件夹，程序将退出。");
-                return {};  // 空列表
-            }
-            cfg.SetValue("music_folder", musicPath);
-            cfg.Save();
-
-            // 重新转换宽字符（因为路径变了）
-            wpath = Utf8ToPath(musicPath);
-        }
-
-        // 3. 标准化全局音乐文件夹路径（去除末尾斜杠）
-        if (!musicPath.empty() && (musicPath.back() == '/' || musicPath.back() == '\\'))
-            musicPath.pop_back();
-        g_musicPath = musicPath;   // 全局变量赋值
-
-        // 4. 获取音乐文件列表（相对路径）
-        musicFiles = GetMusicFiles(musicPath);
-        if (musicFiles.empty()) {
-            return {};  // 没有音乐文件，直接返回
-        }
-
-        // 5. 恢复上次播放的歌曲（需要统一格式）
-        // initMusicList 里
-        std::string lastMusic;
-
-        lastMusic = cfg.GetValue<std::string>("last_music_local", "");
-
-        if (!lastMusic.empty()) {
-            auto it = std::find(musicFiles.begin(), musicFiles.end(), lastMusic);
-            CurrentIndex = (it != musicFiles.end())
-                ? (int)std::distance(musicFiles.begin(), it)
-                : 0;
-        }
-        else {
-            CurrentIndex = 0;
-        }
-        // 6. 启动 Sonos HTTP 服务器（使用最终有效的 wpath）
-            int port = FindAvailablePort(8000, 11000);
-        g_sonos->StartHttpServer(wpath, port);  //改这里！！！
+void initMusicList() {
+    // 根据配置决定使用哪个源（工厂模式）
+    if (g_online_player) {
+        g_source = CreateNeteaseSource();
     }
     else {
-        auto& api = NeteaseAPIManager::GetInstance();
-        std::string playlistID ;
-        long long ll_playlistID = 0 ;
-        std::vector<std::string> ids;
-        std::vector<NeteaseSongInfo> songs;
-        try{
-            auto playlistID = cfg.GetValue<std::string>("netease_playlist_id", "");
-            auto ll_playlistID = std::stoll(playlistID);
-            ids = api.GetPlaylistTrackIds(ll_playlistID);
-            songs = api.GetSongsDetail(ids);  // 获取前 N 个
-        }
-        catch (...) {
-            ShowMessageBox("退出", "未配置网易云歌单ID或API地址配置错误（有可能已经失效），程序将退出");
-            PostMessage(g_hWnd, WM_CLOSE, 0, 0);
-        }
-        
-        for (auto& s : songs) {
-            // 添加到歌单
-            if (g_skip_vip) {
-                if (!(s.fee == 0 ||s.fee==8)) {
-                    continue;
-                }
-            }
-            musicFiles.push_back( s.id);  // 用前缀标识
-            std::string artistsStr;
-            for (size_t i = 0; i < s.artists.size(); ++i) {
-                if (i > 0) artistsStr += ", ";  // 使用逗号+空格分隔
-                artistsStr += s.artists[i];
-            }
-            g_online_album_urls.push_back(s.albumArtUrl);
-            if (s.fee == 1 || s.fee == 2 ) {
-                only_music_file_name.push_back("[VIP] " + s.name + " - " + artistsStr);
-            }
-            else {
-                only_music_file_name.push_back(s.name + " - " + artistsStr);
-            }
-            // 可存储 fee 信息到 map
-            
-        }
-        std::string lastMusic = cfg.GetValue<std::string>("last_music_online", "");
-        if (!lastMusic.empty()) {
-            auto it = std::find(musicFiles.begin(), musicFiles.end(), lastMusic);
-            CurrentIndex = (it != musicFiles.end())
-                ? (int)std::distance(musicFiles.begin(), it)
-                : 0;
-        }
-        else {
-            CurrentIndex = 0;
-        }
-        int port = FindAvailablePort(8000, 11000);
-        try {
-            std::string dir = GetCacheDirectory();
-            PathType wdir = Utf8ToPath(dir);
-            g_sonos->StartHttpServer(wdir, port);
-        }
-        catch (...) {
-            OutputDebugStringA("创建HTTP服务器异常");
-        }
+        g_source = CreateLocalSource();
     }
 
+    if (!g_source || !g_source->Init()) {
+        ShowMessageBox("退出", "初始化播放列表失败，请检查网络或配置。");
+        RequestQuitProgram();
+        return;
+    }
 
-    return musicFiles;
+    // 恢复上次播放进度
+    CurrentIndex = g_source->GetLastIndex();
+
+    // 如果列表为空，重置进度
+    if (g_source->GetCount() == 0) {
+        CurrentIndex = -1;
+    }
 }
 
 
@@ -1562,7 +1498,7 @@ static void SnapToEdgeWithAnimation() {
 }
 
 int Destroy(HWND hWnd) {
-    SaveLastMusic();
+    cfg.Save();
     RECT rc = GetWindowRectPlat(hWnd);
     if (rc.right > rc.left && rc.bottom > rc.top) {
         int lastX = cfg.GetValue<int>("window_x", -1);
@@ -1625,33 +1561,35 @@ bool ChangePlayMode() {
 
     return IsPlaying;
 }
-void auto_play_next_song() {
-    if (MusicFiles.empty()) return;
+void AutoPlayNextSong() {
+    if (!g_source) return;
+    size_t trackCount = g_source->GetCount();
+    if (trackCount == 0) return;
 
     int nextIndex = CurrentIndex;
-    if (g_PlayOrder == 0) {  // 顺序播放
-        nextIndex = (CurrentIndex + 1) % (int)MusicFiles.size();
+    if (g_PlayOrder == 0) {
+        nextIndex = (CurrentIndex + 1) % trackCount;
     }
-    else if (g_PlayOrder == 1) {  // 单曲循环
+    else if (g_PlayOrder == 1) {
         nextIndex = CurrentIndex;
     }
-    else if (g_PlayOrder == 2) {  // 随机播放
+    else if (g_PlayOrder == 2) {
+        // 原有的随机逻辑，需要根据 g_source->GetBaseTrack(i)->id 来比对
         if (g_RemainPlaylist.empty()) {
-            g_RemainPlaylist = MusicFiles;
+            g_RemainPlaylist.clear();
+            for (size_t i = 0; i < trackCount; ++i) g_RemainPlaylist.push_back(g_source->GetBaseTrack(i)->id);
         }
-        // 移除当前歌曲
-        auto it = std::find(g_RemainPlaylist.begin(), g_RemainPlaylist.end(), MusicFiles[CurrentIndex]);
+        auto it = std::find(g_RemainPlaylist.begin(), g_RemainPlaylist.end(), g_source->GetBaseTrack(CurrentIndex)->id);
         if (it != g_RemainPlaylist.end()) g_RemainPlaylist.erase(it);
         if (g_RemainPlaylist.empty()) {
-            g_RemainPlaylist = MusicFiles;
+            for (size_t i = 0; i < trackCount; ++i) g_RemainPlaylist.push_back(g_source->GetBaseTrack(i)->id);
         }
-        // 随机选一首
         int r = rand() % (int)g_RemainPlaylist.size();
-        std::string nextSong = g_RemainPlaylist[r];
-        // 找到索引
-        for (int i = 0; i < (int)MusicFiles.size(); ++i) {
-            if (MusicFiles[i] == nextSong) {
-                nextIndex = i;
+        std::string nextSongId = g_RemainPlaylist[r];
+
+        for (size_t i = 0; i < trackCount; ++i) {
+            if (g_source->GetBaseTrack(i)->id == nextSongId) {
+                nextIndex = (int)i;
                 break;
             }
         }
@@ -1686,14 +1624,14 @@ uint32_t GetIconColorForTheme(const std::string& mode) {
 
 void OnReadyPlay(AsyncPlayResult* result) {
     if (result->taskId != g_AsyncTaskId_download) {
-        // 收到的是过期任务的消息，丢弃
-        OutputDebugStringA("[OnReadyPlay] 丢弃过期任务\n");
         delete result;
         return;
     }
 
     if (result->success) {
+        // ★ 主线程更新 UI 的当前索引
         CurrentIndex = result->index;
+        // ★ 底层只负责放音
         PlayLocalFile(result->localPath);
     }
     else {
@@ -1709,26 +1647,25 @@ void OnPlayFailed(AsyncPlayResult* result) {
     delete result;
 }
 void OnMediaNext() {
-    if (MusicFiles.empty()) return;
-    if (CurrentIndex + 1 < (int)MusicFiles.size()) {
-        auto_play_next_song();
+    if (!g_source || g_source->GetCount() == 0) return;
+    if (CurrentIndex + 1 < (int)g_source->GetCount()) {
+        AutoPlayNextSong();
     }
     else {
         UpdateCurrentPlaying(0);
     }
 }
 
+
 void OnMediaPrev() {
-    
-    if (MusicFiles.empty()) return;
+    if (!g_source || g_source->GetCount() == 0) return;
     if (CurrentIndex - 1 >= 0) {
         UpdateCurrentPlaying(CurrentIndex - 1);
     }
     else {
-        UpdateCurrentPlaying((int)MusicFiles.size() - 1);
+        UpdateCurrentPlaying((int)g_source->GetCount() - 1);
     }
 }
-
 void OnHotkey(int id) {
     OutputDebugStringA(("[hotkey] OnHotkey id=" + std::to_string(id) + "\n").c_str());
     switch (id) {
@@ -1826,7 +1763,7 @@ void OnAnimationTick() {
 }
 void OnSonosStopped() {
     if (g_sonos_connect && IsPlaying) {
-        auto_play_next_song();
+        AutoPlayNextSong();
     }
 }
 // ═══════════════════════════════════════════════════════════
@@ -2330,8 +2267,10 @@ void RenderFrame(int counter,SettingWindow& settings) {
         ImGui::SetNextItemAllowOverlap();
         if (ImGui::BeginListBox("##MusicList", listbox_size)) {
             bool scrolled = false;
-            for (int i = 0; i < (int)only_music_file_name.size(); ++i) {
+            size_t trackCount = g_source->GetCount();
+            for (int i = 0; i < trackCount; ++i) {
                 int t_scrollToSong = -1;
+                const BaseTrackInfo* track = g_source->GetBaseTrack(i);
                 bool is_selected = (CurrentIndex == i);
 
                 if (g_needScrollToSong && i == g_targetScrollIndex) {
@@ -2352,9 +2291,12 @@ void RenderFrame(int counter,SettingWindow& settings) {
                 bool isMatch = false;
                 if (strlen(g_searchKeyword) > 0) {
                     std::string kw = g_searchKeyword;
-                    std::string title = only_music_file_name[i];
+                    // ★ 修改：从接口获取 displayName 替代旧的 only_music_file_name[i]
+                    std::string title = track ? track->displayName : "";
+
                     std::transform(kw.begin(), kw.end(), kw.begin(), ::tolower);
                     std::transform(title.begin(), title.end(), title.begin(), ::tolower);
+
                     if (title.find(kw) != std::string::npos) {
                         isMatch = true;
                     }
@@ -2377,9 +2319,9 @@ void RenderFrame(int counter,SettingWindow& settings) {
                 }
 
                 // 绘制条目
-                if (SelectableWithStyle(only_music_file_name[i].c_str(), is_selected, 6.0f)) {
+                if (SelectableWithStyle(track ? track->displayName.c_str() : "No Display Name 无显示名称", is_selected, 6.0f)) {
                     CurrentIndex = i;
-                    PlayMusicFile(MusicFiles[i]);
+                    PlayMusicFile(CurrentIndex);
                 }
 
                 // 弹出颜色（必须平衡！）
@@ -2497,7 +2439,18 @@ void RenderFrame(int counter,SettingWindow& settings) {
 
         if (ImGui::ImageButton(modeName, (ImTextureID)GetIcon(modeName), ImVec2(16, 16))) {
             g_PlayOrder = (g_PlayOrder + 1) % 3;
-            if (g_PlayOrder == 2) g_RemainPlaylist = MusicFiles;
+
+            // ★ 切换为随机播放时，重新填充随机播放池
+            if (g_PlayOrder == 2) {
+                g_RemainPlaylist.clear();
+                size_t trackCount = g_source->GetCount();
+                for (size_t i = 0; i < trackCount; ++i) {
+                    const BaseTrackInfo* track = g_source->GetBaseTrack(i);
+                    if (track) {
+                        g_RemainPlaylist.push_back(track->id);
+                    }
+                }
+            }
         }
         ImGui::SameLine();
 
@@ -2983,8 +2936,9 @@ void RenderFrame(int counter,SettingWindow& settings) {
                 std::string keyword = g_searchKeyword;
                 if (!keyword.empty()) {
                     std::transform(keyword.begin(), keyword.end(), keyword.begin(), ::tolower);
-                    for (int i = 0; i < (int)only_music_file_name.size(); ++i) {
-                        std::string title = only_music_file_name[i];
+                    for (int i = 0; i < g_source->GetCount(); ++i) {
+                        const BaseTrackInfo* track = g_source->GetBaseTrack(i);
+                        std::string title = track ? track->displayName : "";
                         std::transform(title.begin(), title.end(), title.begin(), ::tolower);
                         if (title.find(keyword) != std::string::npos) {
                             g_searchResults.push_back(i);
@@ -3050,27 +3004,6 @@ void RenderFrame(int counter,SettingWindow& settings) {
     // 渲染 D3D11
     ImGui::Render();
 }
-void InitDisplayName() {
-    if (!g_online_player){
-        for (size_t i = 0; i < MusicFiles.size(); ++i) {
-            try {
-                const std::string& absPath = MusicFiles[i];
-                // 直接按长度截取
-                std::string relPath = absPath.substr(g_musicPath.size());
-                // 去掉开头的斜杠（如果有）
-                if (!relPath.empty() && (relPath[0] == '/' || relPath[0] == '\\')) {
-                    relPath.erase(0, 1);
-                }
-                // 统一分隔符（可选）
-                std::replace(relPath.begin(), relPath.end(), '\\', '/');
-                only_music_file_name.push_back(relPath);
-            }
-            catch (...) {
-                only_music_file_name.push_back(MusicFiles[i]);
-            }
-        }
-    }//online另行处理
-}
 void StartSearchSonos() {
     g_searchFuture = std::async(std::launch::async, []() {
         SonosController ctrl;   // 每个线程独立控制器，避免共享状态问题
@@ -3119,8 +3052,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // 如果设置失败，可以输出调试信息，但不影响程序继续运行
         OutputDebugString(L"Failed to set AppUserModelID\n");
     }
-    MusicFiles = initMusicList();
-    if (MusicFiles.empty())return 0;
+    initMusicList();//音乐源在这里初始化
     if (!InitPlayerEngine())return 1;
     try { winrt::init_apartment(); }//winrt初始化
     catch (...) { OutputDebugStringA("winrt没有初始化\n"); }
@@ -3140,7 +3072,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     UpdateCurrentPlaying(CurrentIndex);
     StartSearchSonos();
     InitTaskbarProgress(g_hWnd);
-    InitDisplayName();
     IconManager::GetInstance().Initialize();
     IconManager::GetInstance().SetThemeColor(g_iconColor);
 
@@ -3172,10 +3103,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (!g_loading_music) {
             if (ma_sound_at_end(&g_CurrentSound) == MA_TRUE && IsPlaying == true && !g_sonos_connect) {
                 ma_sound_stop(&g_CurrentSound);
-                auto_play_next_song();
+                AutoPlayNextSong();
             }
             /*else if (g_sonos_connect && IsPlaying == true && PlayCurrentMs >= PlayMusicLongMs - 100) {
-                auto_play_next_song();
+                AutoPlayNextSong();
             }*/
             //else if (g_sonos_connect && IsPlaying) {
             //    if (counter == 30) {
@@ -3190,7 +3121,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             //            if (player->GetTransportInfo(vars)) {
             //                std::string state = vars.GetValue("CurrentTransportState");
             //                if (state == "STOPPED" || state == "PAUSED_PLAYBACK") {
-            //                    auto_play_next_song();
+            //                    AutoPlayNextSong();
             //                }
             //            }
             //        }
@@ -3491,7 +3422,7 @@ int main(int argc, char** argv) {
         if (!g_loading_music) {
             if (ma_sound_at_end(&g_CurrentSound) == MA_TRUE && IsPlaying == true && !g_sonos_connect) {
                 ma_sound_stop(&g_CurrentSound);
-                auto_play_next_song();
+                AutoPlayNextSong();
             }
         }
         LnxPollEvents();
