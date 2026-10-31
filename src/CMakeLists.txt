@@ -38,15 +38,15 @@ set(PROJ_THIRD_PARTY ${PROJ_ROOT}/third-party)
 # NOTE: platform_linux.cpp is in platform/, not platform/linux/
 set(APP_SOURCES
     ${PROJ_APP}/main.cpp
-    ${PROJ_APP}/albumimgtagreader.cpp
-    ${PROJ_APP}/manageconfig.cpp
+    ${PROJ_APP}/TagReader.cpp
+    ${PROJ_APP}/ManageConfig.cpp
     ${PROJ_APP}/SettingItem.cpp
     ${PROJ_APP}/AMLLWebSocketV2.cpp
     ${PROJ_APP}/SonosController.cpp
     ${PROJ_APP}/IconManager.cpp
     ${PROJ_APP}/NeteaseAPIManager.cpp
     ${PROJ_APP}/ThemePack.cpp
-    ${PROJ_APP}/platform/platform_linux.cpp
+    ${PROJ_APP}/platform/PlatformLinux.cpp
     ${PROJ_APP}/LocalSource.cpp
     ${PROJ_APP}/NeteaseSource.cpp
 

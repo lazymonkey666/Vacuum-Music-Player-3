@@ -1,5 +1,5 @@
-// albumimgtagreader.cpp
-#include "albumimgtagreader.h"
+// TagReader.cpp
+#include "TagReader.h"
 #include <platform/platform.h>
 #include <taglib/mpegfile.h>
 #include <taglib/id3v2tag.h>

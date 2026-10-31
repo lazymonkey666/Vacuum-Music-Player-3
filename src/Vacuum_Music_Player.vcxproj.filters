@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="albumimgtagreader.cpp">
+    <ClCompile Include="TagReader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="manageconfig.cpp">
+    <ClCompile Include="ManageConfig.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="SonosController.cpp">
@@ -36,7 +36,7 @@
     <ClCompile Include="AMLLWebSocketV2.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="platform\platform_windows.cpp">
+    <ClCompile Include="platform\PlatformWindows.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
@@ -164,10 +164,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="albumimgtagreader.h">
+    <ClInclude Include="TagReader.h">
       <Filter>源文件</Filter>
     </ClInclude>
-    <ClInclude Include="manageconfig.h">
+    <ClInclude Include="ManageConfig.h">
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">

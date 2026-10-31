@@ -1,6 +1,6 @@
 #include "MusicSource.h"
 #include <platform/platform.h>
-#include <manageconfig.h>
+#include <ManageConfig.h>
 #include <NeteaseAPIManager.h>
 
 extern std::string g_netease_user_cookie;

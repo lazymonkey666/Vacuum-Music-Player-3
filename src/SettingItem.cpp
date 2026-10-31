@@ -1,5 +1,5 @@
 #include "SettingItem.h"
-#include "manageconfig.h"
+#include "ManageConfig.h"
 #include <string>
 #include <MusicSource.h>   // ★ 需要完整定义（AddSettings 调用）
 

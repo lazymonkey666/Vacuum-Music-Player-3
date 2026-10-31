@@ -1,4 +1,4 @@
-#include "manageconfig.h"
+#include "ManageConfig.h"
 #include <fstream>
 #include <iostream>
 #include <regex>

@@ -1,4 +1,4 @@
-// albumimgtagreader.h
+// TagReader.h
 #pragma once
 
 #include <platform/platform.h>

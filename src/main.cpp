@@ -38,14 +38,12 @@ license:GPL-3.0 license
 #include <taglib/xiphcomment.h>
 #include <taglib/flacpicture.h>
 
-#include <filedialog.cpp>
-
 // ImGui 核心
 #include <imgui/imgui.h>
 
 // 项目内部（逻辑层）
-#include <albumimgtagreader.h>
-#include <manageconfig.h>
+#include <TagReader.h>
+#include <ManageConfig.h>
 #include <AMLLWebSocketV2.h>
 #include <SonosController.h>
 #include <SettingItem.h>

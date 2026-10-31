@@ -7,7 +7,7 @@
 #include <memory>
 #include <sstream>
 #include <type_traits>
-#include "manageconfig.h"
+#include "ManageConfig.h"
 #include <cstdio>
 #include <typeinfo>
 

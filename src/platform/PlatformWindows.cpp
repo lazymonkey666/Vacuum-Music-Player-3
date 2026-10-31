@@ -885,7 +885,7 @@ void PrepareImGui() {
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 }
 
-// platform_windows.cpp
+
 void OpenUrlInBrowser(const std::string& url) {
     PathType wUrl = Utf8ToPath(url);
     if (wUrl.empty()) return;
