@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <GL/gl.h>
 #include <chrono>
+#include "linux/LinuxThemeDetector.h"
 
 #include <GLFW/glfw3.h>
 #include "imgui/imgui.h"
@@ -95,8 +96,88 @@ void OutputDebugStringA(const char* s) { if (s) fputs(s, stderr); }
 // 窗口外观（全部空实现，暂时不影响运行）
 // ═══════════════════════════════════════════════════════════
 void EnableAcrylic(WindowHandle, uint8_t, uint32_t) {}
-bool IsDarkModeByRegistry() { return false; }
-uint32_t GetAccentColorFromRegistry() { return 0xFF0078D4; }
+// 辅助函数：执行命令并获取输出
+static std::string ExecCommand(const std::string& cmd) {
+    char buffer[128];
+    std::string result = "";
+    FILE* pipe = popen((cmd + " 2>/dev/null").c_str(), "r");
+    if (!pipe) return "";
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        result += buffer;
+    }
+    pclose(pipe);
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r' || result.back() == ' ')) {
+        result.pop_back();
+    }
+    return result;
+}
+
+// 辅助函数：忽略大小写判断子串
+static bool ContainsIgnoreCase(const std::string& str, const std::string& keyword) {
+    std::string s = str;
+    std::string k = keyword;
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    std::transform(k.begin(), k.end(), k.begin(), ::tolower);
+    return s.find(k) != std::string::npos;
+}
+
+// 核心查询逻辑（只在第一次调用时执行）
+static bool PerformSyncQuery() {
+    std::string result;
+
+    // 1. 检查环境变量
+    const char* envTheme = std::getenv("GTK_THEME");
+    if (envTheme && ContainsIgnoreCase(envTheme, "dark")) return true;
+
+    // 2. GNOME / Ubuntu
+    result = ExecCommand("gsettings get org.gnome.desktop.interface color-scheme");
+    if (result == "'prefer-dark'") return true;
+    if (result == "'prefer-light'") return false;
+
+    // 3. GNOME GTK Theme
+    result = ExecCommand("gsettings get org.gnome.desktop.interface gtk-theme");
+    if (!result.empty() && result != "''") return ContainsIgnoreCase(result, "dark");
+
+    // 4. Cinnamon
+    result = ExecCommand("gsettings get org.cinnamon.desktop.interface gtk-theme");
+    if (!result.empty() && result != "''") return ContainsIgnoreCase(result, "dark");
+
+    // 5. MATE
+    result = ExecCommand("gsettings get org.mate.interface gtk-theme");
+    if (!result.empty() && result != "''") return ContainsIgnoreCase(result, "dark");
+
+    // 6. XFCE
+    result = ExecCommand("xfconf-query -c xsettings -p /Net/ThemeName");
+    if (!result.empty()) return ContainsIgnoreCase(result, "dark");
+
+    // 7. KDE Plasma
+    result = ExecCommand("kreadconfig5 --file kdeglobals --group General --key ColorScheme");
+    if (result.empty()) result = ExecCommand("kreadconfig6 --file kdeglobals --group General --key ColorScheme");
+    if (!result.empty()) return ContainsIgnoreCase(result, "dark") || ContainsIgnoreCase(result, "breeze-dark");
+
+    return false; // 默认浅色
+}
+
+// ==========================================
+// 提供给主线程调用的接口（仅在启动时查一次）
+// ==========================================
+bool IsDarkModeByRegistry() {
+    static bool isDark = false;
+    static bool initialized = false;
+
+    if (!initialized) {
+        initialized = true;
+        isDark = PerformSyncQuery();
+        OutputDebugStringA(isDark ? "[Theme] 启动检测: 深色模式 (Dark)\n" : "[Theme] 启动检测: 浅色模式 (Light)\n");
+    }
+
+    return isDark;
+}
+
+// 顺便把强调色也改得现代化一点
+uint32_t GetAccentColorFromRegistry() {
+    return 0xFF0078D4; // Windows 默认蓝，或者你可以去查 D-Bus 的 accent-color
+}
 
 // ═══════════════════════════════════════════════════════════
 // 窗口管理

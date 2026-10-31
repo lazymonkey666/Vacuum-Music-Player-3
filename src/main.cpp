@@ -3431,6 +3431,7 @@ int main(int argc, char** argv) {
 
     ReadConfig();
 
+
     if (!g_apiAddr.empty() && g_online_player) {
         NeteaseAPIManager::GetInstance().SetBaseURL(g_apiAddr);
     }

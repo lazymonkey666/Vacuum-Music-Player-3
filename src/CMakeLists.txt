@@ -27,6 +27,7 @@ find_package(CURL REQUIRED)
 pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
 pkg_check_modules(GLFW3  REQUIRED IMPORTED_TARGET glfw3)
 pkg_check_modules(NOSON  REQUIRED IMPORTED_TARGET noson)
+pkg_check_modules(DBUS REQUIRED IMPORTED_TARGET dbus-1)
 
 # --- Paths ---
 set(PROJ_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -46,7 +47,7 @@ set(APP_SOURCES
     ${PROJ_APP}/NeteaseAPIManager.cpp
     ${PROJ_APP}/ThemePack.cpp
     ${PROJ_APP}/platform/platform_linux.cpp
-)
+    ${PROJ_APP}/platform/linux/LinuxThemeDetector.cpp)
 
 # --- ImGui ---
 set(IMGUI_SOURCES
@@ -153,6 +154,7 @@ target_link_libraries(Vacuum_Music_Player_CMAKE PRIVATE
     PkgConfig::TAGLIB
     PkgConfig::GLFW3
     PkgConfig::NOSON
+    PkgConfig::DBUS
     OpenGL::GL
     Threads::Threads
     dl
