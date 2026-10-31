@@ -20,11 +20,10 @@
 #include <vector>
 #include <filesystem>
 
-// Ԥ�����˹Ȩ�ر������ڰ뾶�� x �仯����� 81 �ְ뾶��
 static std::vector<float> ComputeGaussianWeights(float radius) {
     if (radius < 1.0f) return { 1.0f };
     float sigma = radius / 3.0f;
-    int kernelSize = (int)(sigma * 6) + 1;  // ���� 6��
+    int kernelSize = (int)(sigma * 6) + 1; 
     int half = kernelSize / 2;
     std::vector<float> weights(kernelSize);
     float sum = 0.0f;
@@ -38,15 +37,13 @@ static std::vector<float> ComputeGaussianWeights(float radius) {
     return weights;
 }
 
-// �����Ա�뾶ģ����direction: 0=ˮƽ, 1=��ֱ��
 static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int width, int height, bool vertical) {
     std::vector<unsigned char> result(pixels.size());
     const float maxRadius = 80.0f;
-    const float fadeEnd = width * 0.55f;  // 172.5 ����
+    const float fadeEnd = width * 0.55f; 
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            // ���㵱ǰ���ص�ģ���뾶������ x ���꣩
             float r = 0.0f;
             if (x <= fadeEnd) {
                 r = maxRadius * (1.0f - (float)x / fadeEnd);
@@ -57,7 +54,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
             }
 
             if (r < 1.0f) {
-                // ����ģ����ֱ�Ӹ���ԭ����
                 int idx = (y * width + x) * 4;
                 result[idx] = pixels[idx];
                 result[idx + 1] = pixels[idx + 1];
@@ -66,7 +62,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
                 continue;
             }
 
-            // ��ȡ�ð뾶�ĸ�˹Ȩ�ر�
             auto weights = ComputeGaussianWeights(r);
             int kernelSize = (int)weights.size();
             int half = kernelSize / 2;
@@ -75,7 +70,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
             float totalWeight = 0.0f;
 
             if (!vertical) {
-                // ˮƽģ��
                 int startX = (std::max)(0, x - half);
                 int endX = (std::min)(width - 1, x + half);
                 for (int sx = startX; sx <= endX; ++sx) {
@@ -91,7 +85,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
                 }
             }
             else {
-                // ��ֱģ��
                 int startY = ((std::max))(0, y - half);
                 int endY = (std::min)(height - 1, y + half);
                 for (int sy = startY; sy <= endY; ++sy) {
@@ -115,7 +108,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
                 result[outIdx + 3] = (unsigned char)(sumA / totalWeight);
             }
             else {
-                // ����
                 int idx = (y * width + x) * 4;
                 result[idx] = pixels[idx];
                 result[idx + 1] = pixels[idx + 1];
@@ -128,7 +120,6 @@ static void VariableDirectionalBlur(std::vector<unsigned char>& pixels, int widt
 }
 
 
-// ����������Ӧ�ý���͸��Ч��
 std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigned char>& imageData, int targetWidth, int targetHeight) {
     OutputDebugStringA(("[PAWG] entry, input=" + std::to_string(imageData.size()) + "\n").c_str());
 
@@ -146,9 +137,8 @@ std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigne
     VariableDirectionalBlur(pixelData, targetWidth, targetHeight, false);
     VariableDirectionalBlur(pixelData, targetWidth, targetHeight, true);
 
-    // 3. Ӧ�� alpha ����͸����ʹ�� smoothstep ���ߣ�������һ����ʼƫ�ƣ�ǰ 10% ��ȫ͸����
-    const float startFade = 0.05f;    // ǰ 5% ������ȫ͸��
-    const float endFade = 0.75f;      // 75% ����ȫ��͸��
+    const float startFade = 0.05f;   
+    const float endFade = 0.75f;      
     for (int y = 0; y < targetHeight; ++y) {
         for (int x = 0; x < targetWidth; ++x) {
             size_t idx = (y * targetWidth + x) * 4 + 3;
@@ -161,7 +151,7 @@ std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigne
                 alpha = 255.0f;
             }
             else {
-                // �� [startFade, endFade] ֮��ƽ����ֵ��ʹ�� smoothstep
+
                 float s = (t - startFade) / (endFade - startFade);
                 // smoothstep: 3*s^2 - 2*s^3
                 float smooth = s * s * (3.0f - 2.0f * s);
@@ -175,7 +165,7 @@ std::vector<unsigned char> ProcessAlbumArtWithGradient(const std::vector<unsigne
     return pixelData;
 }
 
-// ��ȡ��չ����Сд��
+
 static std::string GetExtension(const PathType& path) {
     std::string ext = std::filesystem::path(path).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -183,7 +173,7 @@ static std::string GetExtension(const PathType& path) {
     return ext;
 }
 
-// ---------- MP3 ----------
+
 static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
     TagLib::MPEG::File file(widePath.c_str());
     if (!file.isValid() || !file.ID3v2Tag()) return {};
@@ -192,7 +182,7 @@ static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
     auto frames = tag->frameListMap()["APIC"];
     if (frames.isEmpty()) return {};
 
-    // ����ȡ FrontCover������ȡ��һ�� APIC ֡
+
     for (auto* frame : frames) {
         auto* pic = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame*>(frame);
         if (pic && pic->type() == TagLib::ID3v2::AttachedPictureFrame::FrontCover) {
@@ -200,7 +190,6 @@ static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
             return std::vector<unsigned char>(data.begin(), data.end());
         }
     }
-    // ���û�� FrontCover�����ص�һ�� APIC ֡
     if (!frames.isEmpty()) {
         auto* firstPic = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame*>(frames.front());
         if (firstPic) {
@@ -211,7 +200,6 @@ static std::vector<unsigned char> ExtractFromMP3(const PathType& widePath) {
     return {};
 }
 
-// ---------- FLAC ----------
 static std::vector<unsigned char> ExtractFromFLAC(const PathType& widePath) {
     TagLib::FLAC::File file(widePath.c_str());
     if (!file.isValid()) return {};
@@ -219,19 +207,16 @@ static std::vector<unsigned char> ExtractFromFLAC(const PathType& widePath) {
     auto pictures = file.pictureList();
     if (pictures.isEmpty()) return {};
 
-    // ����ȡ FrontCover
     for (auto* pic : pictures) {
         if (pic->type() == TagLib::FLAC::Picture::FrontCover) {
             TagLib::ByteVector data = pic->data();
             return std::vector<unsigned char>(data.begin(), data.end());
         }
     }
-    // ����ȡ��һ��
     TagLib::ByteVector data = pictures[0]->data();
     return std::vector<unsigned char>(data.begin(), data.end());
 }
 
-// ---------- M4A / MP4 ----------
 static std::vector<unsigned char> ExtractFromM4A(const PathType& widePath) {
     TagLib::MP4::File file(widePath.c_str());
     if (!file.isValid() || !file.tag()) return {};
@@ -263,12 +248,10 @@ static std::string ExtractLyricsFromFLAC(const PathType& widePath) {
     TagLib::Ogg::XiphComment* xiph = file.xiphComment();
     if (!xiph) return "";
 
-    // Vorbisע���и��ͨ���洢�� "LYRICS" �ֶ�
     auto lyricsList = xiph->fieldListMap()["LYRICS"];
     if (!lyricsList.isEmpty()) {
         return lyricsList.front().to8Bit(true);
     }
-    // ��ѡ����Щ����Ҳ�� "UNSYNCEDLYRICS"
     lyricsList = xiph->fieldListMap()["UNSYNCEDLYRICS"];
     if (!lyricsList.isEmpty()) {
         return lyricsList.front().to8Bit(true);
@@ -279,12 +262,10 @@ static std::string ExtractLyricsFromFLAC(const PathType& widePath) {
 std::string GetLyricsFromFile(const PathType& widePath) {
     std::string ext = GetExtension(widePath);
 
-    // FLAC �� Xiph ע��·��
     if (ext == "flac") {
         return ExtractLyricsFromFLAC(widePath);
     }
 
-    // MP3 / �������ܴ�ID3v2�ĸ�ʽ
     TagLib::FileRef f(widePath.c_str());
     if (f.isNull() || !f.tag()) return "";
 
@@ -294,7 +275,6 @@ std::string GetLyricsFromFile(const PathType& widePath) {
         id3v2tag = mpegFile->ID3v2Tag();
     }
     else {
-        // ���� FLAC Ƕ�� ID3v2 ���������ѡ������
         TagLib::FLAC::File* flacFile = dynamic_cast<TagLib::FLAC::File*>(f.file());
         if (flacFile) {
             id3v2tag = flacFile->ID3v2Tag();
@@ -313,56 +293,26 @@ std::string GetLyricsFromFile(const PathType& widePath) {
     }
     return "";
 }
-PathType FindLrcFile(const PathType& musicFilePath) {
+PathType FindLrcFile(const PathType& musicFilePath)
+{
     namespace fs = std::filesystem;
-    fs::path musicPath(musicFilePath);
-    fs::path musicDir = musicPath.parent_path();
-    fs::path baseName = musicPath.stem();
 
-    // 1. ͬĿ¼���� .lrc / .LRC
-    for (const char* ext : { ".lrc", ".LRC" }) {
-        fs::path lrcPath = musicDir / baseName;
-        lrcPath += ext;
-        if (fs::exists(lrcPath)) {
-            return lrcPath.native();   // fs::path �� PathType��ƽ̨ԭ�����ͣ�
-        }
+    // 用宽字符串算路径，别让任何 char 掺和
+    PathType stem = musicFilePath;
+    size_t dot = stem.find_last_of(L'.');
+    if (dot != PathType::npos) stem = stem.substr(0, dot);
+
+    // 按优先级尝试的扩展名
+    const PathType exts[] = { L".lrc", L".LRC", L".txt" };
+    for (const auto& e : exts) {
+        fs::path candidate = stem + e;         // PathType + PathType → PathType
+        std::error_code ec;
+        if (fs::exists(candidate, ec) && !ec)
+            return candidate.wstring();
     }
-
-    // 2. �����ĸ���ļ�������UTF-8 ����������ƽ̨ͨ�ã�
-    const std::vector<fs::path> lyricFolderNames = {
-        fs::path("lyrics"),
-        fs::path("Lyrics"),
-        fs::path("LYRICS"),
-        fs::path("���"),
-        fs::path("LYRIC"),
-        fs::path("Lyric"),
-    };
-
-    for (const auto& folderName : lyricFolderNames) {
-        fs::path lyricDir = musicDir / folderName;
-        if (!fs::exists(lyricDir) || !fs::is_directory(lyricDir)) {
-            continue;
-        }
-
-        for (const auto& entry : fs::directory_iterator(lyricDir)) {
-            if (!entry.is_regular_file()) continue;
-
-            // ��չ���Ƚϣ�Сд��
-            std::string ext = entry.path().extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(),
-                [](unsigned char c) { return (char)std::tolower(c); });
-            if (ext != ".lrc") continue;
-
-            // ���ļ����Ƚ�
-            if (entry.path().stem() == baseName) {
-                return entry.path().native();
-            }
-        }
-    }
-
-    return {};   // �� PathType
+    return {};   // 没找到
 }
-// ---------- ͳһ��� ----------
+// ----------统一入口----------
 std::vector<unsigned char> ExtractAlbumArt(const PathType& filePath) {
     std::string ext = GetExtension(filePath);
     if (ext == "mp3")   return ExtractFromMP3(filePath);

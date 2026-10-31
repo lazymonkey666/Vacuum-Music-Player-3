@@ -9,7 +9,10 @@
 #include <type_traits>
 #include "manageconfig.h"
 #include <cstdio>
+#include <typeinfo>
 
+// ★ 前向声明，避免与 MusicSource.h 循环
+class IMusicSource;
 
 // forward declare PickFolderDialog (avoid including .cpp). Do not repeat default parameter here.
 #include <typeinfo>
@@ -362,7 +365,8 @@ struct SettingItemAbout : SettingItemBase {
 struct SettingCategory {
     std::string name;
     std::vector<std::unique_ptr<SettingItemBase>> items;
-    SettingCategory(const char* n) : name(n) {}
+
+    explicit SettingCategory(std::string n) : name(std::move(n)) {}
 };
 
 class SettingWindow {
@@ -372,9 +376,25 @@ public:
     void setOpen(bool open) { open_ = open; }
     bool isOpen() const { return open_; }
 
+    // 保留接口兼容，用于将来（暂只作为激活源标记，主要靠 config 判断）
+    void setSource(IMusicSource* src) { m_activeSource = src; }
+
 private:
+    void BuildSourceCategories();      // ★ 首次打开时懒构建
+
     ManageConfig& cfg;
     std::vector<SettingCategory> categories_;
     bool open_ = false;
-    int selectedCategory_ = 0;
+    int  selectedCategory_ = 0;
+
+    // ★ 每个已注册源对应一个槽位（仅存元数据，实例是临时的）
+    struct SourceSlot {
+        std::string id;
+        std::string displayName;
+        int categoryIndex = -1;        // 在 categories_ 中的位置
+    };
+    std::vector<SourceSlot> m_sourceSlots;
+    bool m_sourcesBuilt = false;       // 只构建一次
+
+    IMusicSource* m_activeSource = nullptr;
 };

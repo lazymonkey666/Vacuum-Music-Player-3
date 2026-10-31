@@ -5,13 +5,26 @@
 
 extern std::string g_netease_user_cookie;
 
-// ★ 网易云专属的私有结构
+// ═══════════════════════════════════════════════════════════
+// ★ 本模块私有设置存储
+// ═══════════════════════════════════════════════════════════
+static std::string s_apiAddress = "";
+static std::string s_playlistId = "";
+static bool        s_skipVip = false;
+
+static void LoadNeteaseSettingsFromConfig() {
+    auto& cfg = ManageConfig::GetInstance();
+    s_apiAddress = cfg.GetValue<std::string>("netease_api_address", "");
+    s_playlistId = cfg.GetValue<std::string>("netease_playlist_id", "");
+    s_skipVip = cfg.GetValue<bool>("skip_vip", false);
+}
+
 struct NeteaseTrackInfo : public BaseTrackInfo {
     std::string title;
     std::string artist;
     std::string album;
-    std::string albumArtUrl; // 私有专属封面
-    int fee = 0;             // 私有专属付费标记
+    std::string albumArtUrl;
+    int fee = 0;
 };
 
 class NeteaseSource : public IMusicSource {
@@ -19,19 +32,19 @@ class NeteaseSource : public IMusicSource {
 
 public:
     bool Init() override {
-        auto& cfg = ManageConfig::GetInstance();
         auto& api = NeteaseAPIManager::GetInstance();
+        LoadNeteaseSettingsFromConfig();
+
+        if (s_apiAddress.empty()) return false;
+        api.SetBaseURL(s_apiAddress);               // ★ 源自洽：自己保证 API 就绪
+
+        if (s_playlistId.empty()) return false;
 
         try {
-            std::string playlistID = cfg.GetValue<std::string>("netease_playlist_id", "");
-            if (playlistID.empty()) return false;
-
-            auto ids = api.GetPlaylistTrackIds(std::stoll(playlistID));
+            auto ids = api.GetPlaylistTrackIds(std::stoll(s_playlistId));
             auto songs = api.GetSongsDetail(ids);
-            bool skipVip = cfg.GetValue<bool>("skip_vip", false);
-
             for (auto& s : songs) {
-                if (skipVip && !(s.fee == 0 || s.fee == 8)) continue;
+                if (s_skipVip && !(s.fee == 0 || s.fee == 8)) continue;
 
                 auto track = std::make_unique<NeteaseTrackInfo>();
                 track->id = s.id;
@@ -49,14 +62,11 @@ public:
 
                 std::string prefix = (s.fee == 1 || s.fee == 2) ? "[VIP] " : "";
                 track->displayName = prefix + s.name + " - " + artistsStr;
-
                 m_tracks.push_back(std::move(track));
             }
             return !m_tracks.empty();
         }
-        catch (...) {
-            return false;
-        }
+        catch (...) { return false; }
     }
 
     size_t GetCount() const override { return m_tracks.size(); }
@@ -65,35 +75,44 @@ public:
     PlaybackInfo PreparePlayback(size_t index) override {
         PlaybackInfo info;
         if (index >= m_tracks.size()) return info;
-
-        const auto& track = m_tracks[index];
+        const auto& t = m_tracks[index];
 
         info.isOnline = true;
-        info.localCacheId = track->id;
-        info.title = track->title;
-        info.artist = track->artist;
-        info.album = track->album;
+        info.localCacheId = t->id;
+        info.title = t->title;
+        info.artist = t->artist;
+        info.album = t->album;
         info.needTags = true;
-        info.lyrics = NeteaseAPIManager::GetInstance().GetLyrics(track->id); // 提前拿到歌词
+        info.lyrics = NeteaseAPIManager::GetInstance().GetLyrics(t->id);
+        info.albumArtUrl = t->albumArtUrl;
+        info.audioUrl = NeteaseAPIManager::GetInstance().GetSongUrl(
+            t->id, "exhigh", g_netease_user_cookie);
         info.isValid = !info.audioUrl.empty();
-
-        // ★ 将私有封面提出来给主程序统一下载
-        info.albumArtUrl = track->albumArtUrl;
-
-        // 获取真实播放地址
-        info.audioUrl = NeteaseAPIManager::GetInstance().GetSongUrl(track->id, "exhigh", g_netease_user_cookie);
-        info.isValid = !info.audioUrl.empty();
-
         return info;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ★ 本源交出自己的设置项
+    // ═══════════════════════════════════════════════════════════
+    void AddSettings(std::vector<std::unique_ptr<SettingItemBase>>& items) override {
+        LoadNeteaseSettingsFromConfig();
+
+        items.push_back(std::make_unique<SettingItemText>(
+            s_apiAddress, "netease_api_address",
+            "网易云API地址（BaseURL）\n例子：http://localhost:3000/\n注意：末尾要有斜杠“/”"));
+        items.push_back(std::make_unique<SettingItemText>(
+            s_playlistId, "netease_playlist_id",
+            "网易云歌单ID\n例子：https://music.163.com/playlist?id=xxxxxxx\n其中的 xxxxxxx 部分填入"));
+        items.push_back(std::make_unique<SettingItem<bool>>(
+            s_skipVip, "skip_vip", "跳过需要 VIP 的音乐"));
     }
 
     int GetLastIndex() const override {
         auto& cfg = ManageConfig::GetInstance();
         std::string last = cfg.GetValue<std::string>("last_music_online", "");
         if (last.empty()) return 0;
-        for (size_t i = 0; i < m_tracks.size(); ++i) {
+        for (size_t i = 0; i < m_tracks.size(); ++i)
             if (m_tracks[i]->id == last) return (int)i;
-        }
         return 0;
     }
 

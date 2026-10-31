@@ -273,6 +273,12 @@ std::string u8string_to_string(const std::u8string& u8str) {
     return std::string(reinterpret_cast<const char*>(u8str.data()), u8str.size());
 }
 
+void RegisterMusicSources() {
+    auto& reg = MusicSourceRegistry::GetInstance();
+    reg.Register({ "local",  "本地播放",       CreateLocalSource });
+    reg.Register({ "online", "在线[网易云]", CreateNeteaseSource });
+}
+
 MusicMetadata GetMusicMetadata(const std::string& filepath_utf8) {
     MusicMetadata meta;
 
@@ -1422,12 +1428,13 @@ void StopAnimation() {
 }
 
 void initMusicList() {
-    // 根据配置决定使用哪个源（工厂模式）
-    if (g_online_player) {
-        g_source = CreateNeteaseSource();
-    }
-    else {
-        g_source = CreateLocalSource();
+    auto& cfg = ManageConfig::GetInstance();
+    std::string playmode = cfg.GetValue<std::string>("play_mode", "local");
+
+    g_source = MusicSourceRegistry::GetInstance().Create(playmode);
+    if (!g_source) {
+        // 兜底：本地
+        g_source = MusicSourceRegistry::GetInstance().Create("local");
     }
 
     if (!g_source || !g_source->Init()) {
@@ -1436,15 +1443,9 @@ void initMusicList() {
         return;
     }
 
-    // 恢复上次播放进度
     CurrentIndex = g_source->GetLastIndex();
-
-    // 如果列表为空，重置进度
-    if (g_source->GetCount() == 0) {
-        CurrentIndex = -1;
-    }
+    if (g_source->GetCount() == 0) CurrentIndex = -1;
 }
-
 
 static void SnapToEdgeWithAnimation() {
     if (g_isAnimating) return;  // 动画进行中，避免冲突
@@ -2498,6 +2499,7 @@ void RenderFrame(int counter,SettingWindow& settings) {
             ImGui::Separator();
             ImGui::EndPopup();
         }
+        settings.setSource(g_source.get());
         settings.render();
         if (s_open_sonos_search_window) {
             ImGui::SetNextWindowSize(ImVec2(450, 350), ImGuiCond_FirstUseEver);
@@ -3036,6 +3038,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 1;
     }
     ReadConfig();
+
+    RegisterMusicSources();
     if (!g_apiAddr.empty() && g_online_player) {
         NeteaseAPIManager::GetInstance().SetBaseURL(g_apiAddr);
     }
@@ -3361,6 +3365,7 @@ int main(int argc, char** argv) {
     }
 
     ReadConfig();
+    RegisterMusicSources();
 
 
     if (!g_apiAddr.empty() && g_online_player) {

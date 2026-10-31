@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <SettingItem.h>
 
 // ==========================================
 // 1. 基础结构（本地与在线公有的基础信息，UI 列表渲染专用）
@@ -36,33 +37,67 @@ struct PlaybackInfo {
 };
 
 // ==========================================
-// 3. 数据源接口
+// 3. 数据源接口（不变，仅在此确认签名）
 // ==========================================
 class IMusicSource {
 public:
     virtual ~IMusicSource() = default;
-
-    // 初始化并加载列表（比如选文件夹、请求网易云API）
     virtual bool Init() = 0;
-
-    // 列表总数
     virtual size_t GetCount() const = 0;
-
-    // 返回公有的基础信息（UI 渲染用）
     virtual const BaseTrackInfo* GetBaseTrack(size_t index) const = 0;
-
-    // C 函数：播放前准备（获取真实播放地址和所有元数据，包含在线私有数据）
-    // 注意：如果是网络请求，此函数会阻塞，主程序必须放入异步线程！
     virtual PlaybackInfo PreparePlayback(size_t index) = 0;
-
-    // 记录/恢复上次播放的索引
+    virtual void AddSettings(std::vector<std::unique_ptr<SettingItemBase>>& items) {}
     virtual int GetLastIndex() const = 0;
     virtual void SaveIndex(int index) = 0;
 };
 
+// ==========================================
+// 4. 工厂注册表（★ 新增 SourceDescriptor）
+// ==========================================
+struct SourceDescriptor {
+    std::string id;            // "local" / "online"
+    std::string displayName;   // "本地播放" / "在线（网易云）"
+    std::function<std::unique_ptr<IMusicSource>()> creator;
+};
 
+class MusicSourceRegistry {
+public:
+    using CreatorFunc = std::function<std::unique_ptr<IMusicSource>()>;
 
+    static MusicSourceRegistry& GetInstance() {
+        static MusicSourceRegistry inst;
+        return inst;
+    }
 
-// 工厂函数，在下方注册播放源
+    // 兼容旧接口（不建议再直接使用，走 Descriptor 版）
+    void Register(const std::string& id, CreatorFunc creator) {
+        descriptors_.push_back({ id, id, std::move(creator) });
+    }
+
+    // ★ 推荐接口：带显示名
+    void Register(const SourceDescriptor& d) {
+        descriptors_.push_back(d);
+    }
+
+    std::unique_ptr<IMusicSource> Create(const std::string& id) {
+        for (auto& d : descriptors_) {
+            if (d.id == id) return d.creator();
+        }
+        return nullptr;
+    }
+
+    const std::vector<SourceDescriptor>& GetDescriptors() const { return descriptors_; }
+
+    std::vector<std::string> GetAllIds() const {
+        std::vector<std::string> ids;
+        for (auto& d : descriptors_) ids.push_back(d.id);
+        return ids;
+    }
+
+private:
+    MusicSourceRegistry() = default;
+    std::vector<SourceDescriptor> descriptors_;
+};
+
 std::unique_ptr<IMusicSource> CreateLocalSource();
 std::unique_ptr<IMusicSource> CreateNeteaseSource();
