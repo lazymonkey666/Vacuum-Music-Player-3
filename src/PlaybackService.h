@@ -23,6 +23,10 @@ public:
 
     // 需要周期回调的服务（如 AMLL）覆盖；简单服务（如 SMTC）不用管
     virtual void Poll(uint64_t /*currentMs*/, bool /*isPlaying*/) {}
+    
+    virtual bool HasWindow() const { return false; }
+    virtual void ShowWindow() {}
+    virtual void RenderWindow() {}
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -62,6 +66,12 @@ public:
     // ── 退出时清理 ──
     void ShutdownAll();
 
+    // ★ 按 id 拿服务实例（供 Backend 访问）
+    IPlaybackService* GetService(const std::string& id);
+
+    // ★ 主循环每帧调一次：渲染所有有窗口的服务
+    void RenderAllWindows();
+
 private:
     PlaybackServiceRegistry() = default;
 
@@ -69,6 +79,8 @@ private:
     std::vector<PlaybackServiceDescriptor> descriptors_;
     // ★ shared_ptr：允许 Tick 快照持有，即使 Disable 了也不悬空
     std::map<std::string, std::shared_ptr<IPlaybackService>> instances_;
+
+    
 };
 
 // ═══════════════════════════════════════════════════════════

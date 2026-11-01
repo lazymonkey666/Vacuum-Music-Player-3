@@ -206,6 +206,7 @@
     <ClCompile Include="PlaybackService.cpp" />
     <ClCompile Include="SmtcService.cpp" />
     <ClCompile Include="SonosBackend.cpp" />
+    <ClCompile Include="SonosService.cpp" />
     <ClCompile Include="TagReader.cpp" />
     <ClCompile Include="AMLLWebSocketV2.cpp" />
     <ClCompile Include="IconManager.cpp" />
@@ -279,6 +280,7 @@
     <ClInclude Include="AsyncEventManager.h" />
     <ClInclude Include="PlaybackBackend.h" />
     <ClInclude Include="PlaybackService.h" />
+    <ClInclude Include="SonosService.h" />
     <ClInclude Include="TagReader.h" />
     <ClInclude Include="AMLLWebSocketV2.h" />
     <ClInclude Include="IconManager.h" />

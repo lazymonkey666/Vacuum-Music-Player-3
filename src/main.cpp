@@ -64,6 +64,9 @@ license:GPL-3.0 license
 //异步事件管理器
 #include <AsyncEventManager.h>
 
+//加载sonos模块
+#include <SonosService.h>
+
 #define HOTKEY_NEXT      1001
 #define HOTKEY_PREV      1002
 #define HOTKEY_PLAYPAUSE 1003
@@ -1472,7 +1475,10 @@ int Destroy(HWND hWnd) {
         }
     }
 
-    // ★ 一行清理所有后端（内部会 StopWorker + 关 ma_engine + stop Sonos）
+
+    PlaybackServiceRegistry::GetInstance().ShutdownAll();
+
+    // 再清理后端
     PlaybackBackendRegistry::GetInstance().ShutdownAll();
 
     // ★ 停掉事件 worker
@@ -2210,6 +2216,14 @@ static void RegisterServices() {
         CreateAMLLService,
         true           // userConfigurable = true
         });
+    reg.Register({
+        "sonos",
+        "Sonos 音响",
+        "service_sonos_enabled",
+        false,                 // 默认关闭
+        CreateSonosService,
+        true
+        });
 }
 void RenderFrame(int counter,SettingWindow& settings) {
     ImGui::NewFrame();
@@ -2537,13 +2551,18 @@ void RenderFrame(int counter,SettingWindow& settings) {
                                 ImGui::SetTooltip("ID: %s", d.id.c_str());
                             }
                         }
+                        if (enabled) {
+                            auto* svc = sreg.GetService(d.id);
+                            if (svc && svc->HasWindow()) {
+                                std::string panelLabel = "  打开 " + d.displayName + " 面板";
+                                if (ImGui::MenuItem(panelLabel.c_str())) {
+                                    svc->ShowWindow();
+                                }
+                            }
+                        }
                     }
                 }
                 ImGui::EndMenu();
-            }
-
-            if (ImGui::MenuItem("打开Sonos连接窗口", NULL)) {
-                s_open_sonos_search_window = !s_open_sonos_search_window;
             }
 
             if (g_netease_user_cookie.empty()) {
@@ -2565,90 +2584,8 @@ void RenderFrame(int counter,SettingWindow& settings) {
         }
         settings.setSource(g_source.get());
         settings.render();
-        if (s_open_sonos_search_window) {
-            ImGui::SetNextWindowSize(ImVec2(450, 400), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("Sonos 控制", &s_open_sonos_search_window,
-                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
-            {
-                auto& reg = PlaybackBackendRegistry::GetInstance();
-                auto* sonos = reg.GetOrCreate("sonos");
+        PlaybackServiceRegistry::GetInstance().RenderAllWindows();
 
-                if (!sonos || !sonos->SupportsDeviceManagement()) {
-                    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sonos 后端不可用");
-                    ImGui::End();
-                }
-                else {
-                    ImGui::Text("播放设备控制");
-                    ImGui::Separator();
-
-                    // 搜索按钮
-                    if (sonos->IsSearchingDevices()) {
-                        ImGui::BeginDisabled();
-                        ImGui::Button("搜索中...");
-                        ImGui::EndDisabled();
-                    }
-                    else {
-                        if (ImGui::Button("搜索设备")) sonos->StartDeviceSearch();
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("回到本机播放")) {
-                        SwitchPlaybackBackend("miniaudio");
-                    }
-
-                    // 拉新结果
-                    auto newDevices = sonos->PollFoundDevices();
-                    if (!newDevices.empty()) {
-                        s_cachedSonosDevices = std::move(newDevices);
-                        s_selectedSonosDeviceIdx = -1;
-                    }
-
-                    // 设备列表
-                    if (sonos->IsSearchingDevices()) {
-                        ImGui::Text("正在搜索...");
-                    }
-                    else if (!s_cachedSonosDevices.empty()) {
-                        ImGui::Text("发现 %d 个设备:", (int)s_cachedSonosDevices.size());
-                        ImGui::BeginChild("DeviceList", ImVec2(0, 100), true);
-                        for (size_t i = 0; i < s_cachedSonosDevices.size(); ++i) {
-                            bool sel = (s_selectedSonosDeviceIdx == (int)i);
-                            if (ImGui::Selectable(s_cachedSonosDevices[i].displayName.c_str(), sel))
-                                s_selectedSonosDeviceIdx = (int)i;
-                        }
-                        ImGui::EndChild();
-
-                        if (s_selectedSonosDeviceIdx >= 0 &&
-                            s_selectedSonosDeviceIdx < (int)s_cachedSonosDevices.size()) {
-
-                            if (!sonos->IsDeviceConnected()) {
-                                if (ImGui::Button("连接此设备")) {
-                                    if (sonos->ConnectToDevice(
-                                        s_cachedSonosDevices[s_selectedSonosDeviceIdx].location)) {
-                                        SwitchPlaybackBackend("sonos");
-                                        ImGui::TextColored(ImVec4(0, 1, 0, 1), "连接成功！");
-                                    }
-                                    else {
-                                        ImGui::TextColored(ImVec4(1, 0, 0, 1), "连接失败！");
-                                    }
-                                }
-                            }
-                            else {
-                                ImGui::TextColored(ImVec4(0, 1, 0, 1), "已连接");
-                            }
-                        }
-                    }
-                    else {
-                        ImGui::Text("尚未搜索或未发现设备。");
-                    }
-
-                    if (sonos->IsDeviceConnected() && reg.ActiveId() == "sonos") {
-                        ImGui::Separator();
-                        ImGui::Text("音响正在播放");
-                    }
-
-                    ImGui::End();
-                }
-            }
-        }
         if (g_netease_account_login_window_status) {
             ImGui::SetNextWindowSize(ImVec2(400, 260), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("网易云登录", &g_netease_account_login_window_status, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {

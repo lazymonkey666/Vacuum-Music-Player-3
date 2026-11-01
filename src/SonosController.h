@@ -34,7 +34,10 @@ public:
     bool ConnectToDevice(const std::string& location);
 
     // 启动本地 HTTP 文件服务器（挂载音乐文件夹）
-    bool StartHttpServer(const PathType& musicFolder, int port);
+    bool StartHttpServer(const PathType& musicFolder,
+        const PathType& cacheFolder,
+        int port);
+
     void SetPlayMode();
 
     // 停止 HTTP 服务器

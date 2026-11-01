@@ -356,6 +356,7 @@ struct SonosController::Impl {
     std::unique_ptr<SONOS::System> sonosSystem;
     std::string localIP ="127.0.0.1";
     int serverPort =0;
+    std::string cachePath;
     std::string musicPath;
     std::thread httpThread;
     httplib::Server* httpServer = nullptr;
@@ -437,69 +438,75 @@ struct SonosController::Impl {
         OutputDebugStringA("[net] localIP fallback to 127.0.0.1\n");
         return "127.0.0.1";
     }
-    bool StartHttpServer(const PathType& musicFolder, int port) {
-        // 1. 检查文件夹
+    bool SonosController::Impl::StartHttpServer(const PathType& musicFolder,
+        const PathType& cacheFolder,
+        int port) {
         if (!std::filesystem::exists(musicFolder)) {
-            OutputDebugStringA("[StartHttpServer] FAIL: folder does not exist");
+            OutputDebugStringA("[Sonos] music folder not exists\n");
             return false;
         }
 
-        // 2. 获取本地IP
         localIP = GetLocalIP();
         if (localIP.empty()) localIP = "127.0.0.1";
 
-        // 3. 端口有效性
         serverPort = port;
-        if (serverPort <= 0 || serverPort > 65535) {
-            OutputDebugStringA("[StartHttpServer] FAIL: invalid port");
-            return false;
+        if (serverPort <= 0 || serverPort > 65535) return false;
+
+        musicPath = PathToUtf8(musicFolder);
+        cachePath = PathToUtf8(cacheFolder);   // ★ 缓存目录
+        if (musicPath.empty()) return false;
+        if (cachePath.empty()) return false;
+
+        // 确保缓存目录存在
+        {
+            std::error_code ec;
+            std::filesystem::create_directories(std::filesystem::path(cacheFolder), ec);
         }
 
-        // 4. 路径转为 UTF-8（用平台函数）
-        musicPath = PathToUtf8(musicFolder);   // ← 一行搞定
-        if (musicPath.empty()) {
-            OutputDebugStringA("[StartHttpServer] FAIL: PathToUtf8 error");
-            return false;
-        }
+        std::string musicUtf8 = musicPath;
+        std::string cacheUtf8 = cachePath;
 
-        // 5. 启动 HTTP 线程（参数传值拷贝，避免悬垂）
-        std::string utf8Path = musicPath;
         httpRunning = true;
-        httpThread = std::thread([this, utf8Path, port]() {
+        httpThread = std::thread([this, musicUtf8, cacheUtf8, port]() {
             httplib::Server svr;
-        
-            // ★ 唯一新增
+
             svr.set_exception_handler([](const httplib::Request& req,
-                                         httplib::Response& res,
-                                         std::exception_ptr ep) {
-                std::string msg;
-                try { std::rethrow_exception(ep); }
-                catch (const std::exception& e) { msg = e.what(); }
-                catch (...) { msg = "unknown"; }
-                OutputDebugStringA(("[httplib] exception on " + req.method + " " +
-                                    req.path + ": " + msg + "\n").c_str());
-                res.status = 500;
-                res.set_content("", "text/plain");
-            });
-        
-            // ★ 可选，能看 4xx/5xx
+                httplib::Response& res,
+                std::exception_ptr ep) {
+                    std::string msg;
+                    try { std::rethrow_exception(ep); }
+                    catch (const std::exception& e) { msg = e.what(); }
+                    catch (...) { msg = "unknown"; }
+                    OutputDebugStringA(("[httplib] exception on " + req.method + " " +
+                        req.path + ": " + msg + "\n").c_str());
+                    res.status = 500;
+                });
+
             svr.set_error_handler([](const httplib::Request& req,
-                                     httplib::Response& res) {
-                OutputDebugStringA(("[httplib] error " + std::to_string(res.status) +
-                                    " on " + req.method + " " + req.path + "\n").c_str());
-            });
-        
-            svr.set_mount_point("/", utf8Path.c_str());
-        
+                httplib::Response& res) {
+                    OutputDebugStringA(("[httplib] error " + std::to_string(res.status) +
+                        " on " + req.method + " " + req.path + "\n").c_str());
+                });
+
+            // ★ 三个挂载点
+            svr.set_mount_point("/", musicUtf8.c_str());   // 兼容旧 URL（本地歌）
+            svr.set_mount_point("/music/", musicUtf8.c_str());   // 显式前缀
+            svr.set_mount_point("/cache/", cacheUtf8.c_str());   // ★ 缓存目录（在线歌）
+
+            OutputDebugStringA(("[Sonos] HTTP mount / -> " + musicUtf8 + "\n").c_str());
+            OutputDebugStringA(("[Sonos] HTTP mount /cache/ -> " + cacheUtf8 + "\n").c_str());
+
             httpServer = &svr;
             if (!svr.listen("0.0.0.0", port)) {
-                OutputDebugStringA("[StartHttpServer] FAIL: listen failed\n");
+                OutputDebugStringA("[Sonos] HTTP listen failed\n");
             }
             httpServer = nullptr;
             httpRunning = false;
-        });
+            });
+
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        OutputDebugStringA(("[StartHttpServer] SUCCESS, port=" + std::to_string(port) + "\n").c_str());
+        OutputDebugStringA(("[Sonos] HTTP started, port=" +
+            std::to_string(port) + "\n").c_str());
         return httpRunning;
     }
 
@@ -673,8 +680,11 @@ bool SonosController::ConnectToDevice(const std::string& location) {
     return true;
 }
 
-bool SonosController::StartHttpServer(const PathType& musicFolder, int port) {
-    return pImpl->StartHttpServer(musicFolder, port);
+// SonosController.cpp
+bool SonosController::StartHttpServer(const PathType& musicFolder,
+    const PathType& cacheFolder,
+    int port) {
+    return pImpl->StartHttpServer(musicFolder, cacheFolder, port);
 }
 
 void SonosController::StopHttpServer() {
@@ -688,6 +698,7 @@ NSROOT::PlayerPtr SonosController::GetPlayer() {
 bool SonosController::PlayFile(const std::string& filename) {
     return pImpl->PlayFile(filename);
 }
+
 
 std::vector<std::string> SonosController::ListMusicFiles() {
     return pImpl->ListMusicFiles();

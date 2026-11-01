@@ -180,6 +180,9 @@
     <ClCompile Include="PlaybackService.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="SonosService.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TagReader.h">
@@ -390,6 +393,9 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="PlaybackService.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SonosService.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

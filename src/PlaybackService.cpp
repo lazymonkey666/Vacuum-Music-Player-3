@@ -180,6 +180,27 @@ void PlaybackServiceRegistry::Tick(uint64_t currentMs, bool isPlaying) {
     }
 }
 
+IPlaybackService* PlaybackServiceRegistry::GetService(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = instances_.find(id);
+    return it != instances_.end() ? it->second.get() : nullptr;
+}
+
+void PlaybackServiceRegistry::RenderAllWindows() {
+    // 快照（shared_ptr 保活）
+    std::vector<std::shared_ptr<IPlaybackService>> snapshot;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        for (auto& kv : instances_) snapshot.push_back(kv.second);
+    }
+    for (auto& svc : snapshot) {
+        if (svc && svc->HasWindow()) {
+            try { svc->RenderWindow(); }
+            catch (...) {}
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────
 void PlaybackServiceRegistry::ShutdownAll() {
     std::map<std::string, std::shared_ptr<IPlaybackService>> toKill;
