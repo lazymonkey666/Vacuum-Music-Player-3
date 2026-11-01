@@ -162,6 +162,24 @@
     <ClCompile Include="NeteaseSource.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="AsyncEventManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="SonosBackend.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MiniaudioBackend.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="SmtcService.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="AMLLService.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="PlaybackService.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TagReader.h">
@@ -360,6 +378,18 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="MusicSource.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AsyncEventManager.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="PlaybackBackend.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AsyncBackendBase.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="PlaybackService.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

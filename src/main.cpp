@@ -18,13 +18,13 @@ license:GPL-3.0 license
 
 #include <platform/platform.h>
 
-
 #include "miniaudio.h"
 #include <stdio.h>
 #include <random>
 #include <atomic>
 #include <cstdint>
 #include <unordered_map>
+#include <iostream>
 
 // TagLib 全家桶
 #include <taglib/fileref.h>
@@ -45,14 +45,24 @@ license:GPL-3.0 license
 #include <TagReader.h>
 #include <ManageConfig.h>
 #include <AMLLWebSocketV2.h>
-#include <SonosController.h>
 #include <SettingItem.h>
 #include <NeteaseAPIManager.h>
 
 #include <IconManager.h>
 #include <ThemePack.h>
+
+//模块化播放源
 #include <MusicSource.h>
-#include <iostream>
+
+//模块化播放后端
+#include <PlaybackBackend.h>
+#include <AsyncBackendBase.h>
+
+//模块化播放服务
+#include <PlaybackService.h>
+
+//异步事件管理器
+#include <AsyncEventManager.h>
 
 #define HOTKEY_NEXT      1001
 #define HOTKEY_PREV      1002
@@ -83,6 +93,9 @@ struct AsyncFetchResult {
     PlaybackInfo info;
 };
 
+static std::string g_curTitle, g_curArtist, g_curAlbum, g_curLyrics;
+static std::vector<unsigned char> g_curAlbumArt;
+
 static int CurrentIndex = -1;          // 当前播放歌曲在 MusicFiles 中的索引
 static float PlayProgressPercent = 0.0f;// 播放进度（百分比）
 static ma_uint64  PlayCurrentMs = 0;// 播放进度（时长）
@@ -90,7 +103,6 @@ static float PlayMusicLong = 0.0f;      // 总时长
 static bool IsPlaying = false;         // 是否正在播放
 static ma_uint64 PlayMusicLongMs = 1;
 //static std::vector<std::string> MusicFiles;
-static ma_uint64 g_TotalPCMFrames = 0; //音乐PCM总帧数
 static bool g_NeedScrollToCurrent = false;  // 滚动标志
 static int g_AsyncTaskId_search = 0;   // 统一的全局任务ID
 static int g_AsyncTaskId_download = 0;
@@ -146,21 +158,15 @@ static int g_currentSearchIndex = -1;             // 当前选中的搜索结果
 static bool g_needScrollToSong = false;
 static int g_targetScrollIndex = -1;
 
-static bool g_AMLL_connect = false;//播放状态
-
 static bool g_sonos_connect = false;//sonos连接状态
 
 //static std::vector<std::string> only_music_file_name = {}; //万年老数组 再见
 
 // 放在合适的作用域（例如 main 循环前，或者作为类的成员）
-static std::unique_ptr<SonosController> g_sonos;          // 全局控制器（只初始化一次）
-static std::future<std::vector<DeviceEntry>> g_searchFuture;
-static bool g_sonos_searching = false;
-static std::vector<DeviceEntry> g_devices;                 // 搜索结果
+           // 搜索结果
 static int g_selectedDevice = -1;                          // 用户选中的设备索引
 
 static std::atomic<bool> g_loading_music{ false };
-static AMLLWebSocketClient* amllplayer = nullptr;
 static int g_opacity = 128;
 static std::string g_dark_mode = "System";
 static bool g_enableSnapToEdge = true;
@@ -227,6 +233,23 @@ static bool g_isAlbumArtTransitioning = false;      // 是否正在播放动画
 static std::chrono::steady_clock::time_point g_albumArtTransStartTime;
 
 static float g_lyricsTargetY = 0.0f;   // 歌词滚动的目标 Y 坐标
+
+
+static uint64_t g_latestLoadTask = 0;   // 最近一次 RequestLoad 的 taskId
+static uint64_t g_latestPlayTask = 0;   // 最近一次 RequestPlay 的 taskId
+static uint64_t g_latestPreLoadId = 0;  // PreLoad 事件 ID，用于丢弃过期事件
+
+// Sonos UI 侧缓存（纯 UI 状态，不属于后端）
+static std::vector<PlaybackDeviceInfo> s_cachedSonosDevices;
+static int s_selectedSonosDeviceIdx = -1;
+
+// 当前后端的快捷访问
+static IPlaybackBackend* ActiveBackend() {
+    return PlaybackBackendRegistry::GetInstance().Active();
+}
+static bool IsSonosActive() {
+    return PlaybackBackendRegistry::GetInstance().ActiveId() == "sonos";
+}
 
 
 struct MusicMetadata {
@@ -353,9 +376,7 @@ static bool g_isDragging = false;
 static POINT g_dragStartPos;
 static POINT g_windowStartPos;
 
-static ma_engine g_AudioEngine;
-static ma_sound g_CurrentSound;
-static bool g_IsSoundLoaded = false;
+
 
 static std::wstring coverPath;
 
@@ -390,6 +411,8 @@ void SaveAndRestart() {
 #endif
     RestartApplication();   // 平台函数
 }
+
+
 
 void UpdateWindowSide() {
     RECT rc = GetWindowRectPlat(g_hWnd);
@@ -1040,164 +1063,87 @@ std::string ExtractExtensionFromUrl(const std::string& url) {
 // 准备在线歌曲：下载、缓存、写入元数据，返回本地路径，失败返回空字符串
 void PlayLocalFile(const std::string& filepath_utf8) {
     PathType widePath = Utf8ToPath(filepath_utf8);
-    if (widePath.empty()) return;
+    if (widePath.empty() || !ActiveBackend()) return;
 
-    // 保留旧封面句柄，重置元数据
-    TextureHandle oldArt = MusicMeta.albumArtSRV;
-    MusicMeta = GetMusicMetadata(filepath_utf8);
-    MusicMeta.albumArtSRV = oldArt;
-
-    // ==========================================
-    // 1. 播放音频引擎 (MiniAudio 或 Sonos)
-    // ==========================================
-    if (!g_sonos_connect) {
-        // 本地播放
-        if (MA_SOUND_INIT_FROM_FILE(&g_AudioEngine, widePath.c_str(), MA_SOUND_FLAG_STREAM, NULL, NULL, &g_CurrentSound) != MA_SUCCESS) {
-            OutputDebugStringA(("播放失败: " + filepath_utf8 + "\n").c_str());
-            return;
-        }
-        IsPlaying = true;//迟来的代码
-    }
-    else {
-        // Sonos 播放：提取纯文件名，丢给 HTTP 服务器
-        std::string baseName = filepath_utf8.substr(filepath_utf8.find_last_of("/\\") + 1);
-        g_sonos->PlayFile(baseName);
-        IsPlaying = true;
+    // 停掉旧播放（异步，不等待）
+    if (ActiveBackend()->IsLoaded()) {
+        ActiveBackend()->RequestUnload();
     }
 
-    // ==========================================
-    // 2. 获取时长
-    // ==========================================
-    float totalSec = 0.0f;
-    if (!g_sonos_connect) {
-        if (ma_sound_get_length_in_seconds(&g_CurrentSound, &totalSec) == MA_SUCCESS) {
-            PlayMusicLong = totalSec;
-            PlayMusicLongMs = (ma_uint64)(totalSec * 1000.0);
-        }
-        else {
-            PlayMusicLong = 0.0f;
-            PlayMusicLongMs = 0;
-        }
-        if (ma_sound_get_length_in_pcm_frames(&g_CurrentSound, &g_TotalPCMFrames) != MA_SUCCESS) {
-            g_TotalPCMFrames = 0;
-        }
-    }
-    else {
-        g_sonos->GetPlayer()->SetPlayMode(SONOS::PlayMode_NORMAL);
-        PlayMusicLongMs = GetAudioFileDurationMs(filepath_utf8);
-    }
+    uint64_t myId = ++g_latestPreLoadId;
 
-    // ==========================================
-    // 3. 解析歌词
-    // ==========================================
-    g_lyrics.clear();
-    g_currentLyricIndex = -1;
-    g_needScrollToLyric = false;
-    std::string orginal_lrc = "Unknow";
+    AsyncEventPayload payload;
+    payload.filePathUtf8 = filepath_utf8;
+    payload.widePath = widePath;
+    payload.trackIndex = CurrentIndex;
+    payload.extraInt = myId;
 
-    std::string id3Lyrics = GetLyricsFromFile(widePath);
-    if (!id3Lyrics.empty()) {
-        g_lyrics = ParseLrc(id3Lyrics);
-        orginal_lrc = id3Lyrics;
-    }
-    else {
-        PathType lrcPath = FindLrcFile(widePath);
-        if (!lrcPath.empty()) {
-            std::string content = ReadTextFile(lrcPath);
-            if (!content.empty()) {
-                if (content.size() >= 3 && (unsigned char)content[0] == 0xEF
-                    && (unsigned char)content[1] == 0xBB && (unsigned char)content[2] == 0xBF) {
-                    content = content.substr(3);
-                }
-                g_lyrics = ParseLrc(content);
-                orginal_lrc = content;
+    // ★ 有回调：PreLoad → 主线程拿结果 → 发起 Load
+    AsyncEventManager::GetInstance().Post(
+        AsyncEventType::PreLoad, std::move(payload),
+        [](AsyncEventPayload& r, bool failed, bool) {
+            if (r.extraInt != g_latestPreLoadId) return;   // 过期丢弃
+            if (failed) {
+                g_loading_music = false;
+                return;
             }
-        }
-    }
 
-    // ==========================================
-    // 4. 提取封面数据并处理 SMTC
-    // ==========================================
-    std::vector<unsigned char> rawAlbumData = ExtractAlbumArt(widePath);
-    int currentTaskId = ++g_AsyncTaskId_search;
+            // 主线程：更新 UI 元数据
+            TextureHandle oldArt = MusicMeta.albumArtSRV;
+            MusicMeta.title = r.title;
+            MusicMeta.artist = r.artist;
+            MusicMeta.album = r.album;
+            g_curTitle = r.title;
+            g_curArtist = r.artist;
+            g_curAlbum = r.album;
+            g_curLyrics = r.lyrics;
+            g_curAlbumArt = r.albumArt;
+            MusicMeta.albumArtSRV = oldArt;
 
-    std::vector<unsigned char> amllCoverData;
-    if (!rawAlbumData.empty()) {
-        amllCoverData = ConvertImageToJPEG(rawAlbumData);
-        if (amllCoverData.empty()) {
-            amllCoverData = rawAlbumData;
-        }
+            // 歌词
+            g_lyrics = ParseLrc(r.lyrics);
+            g_currentLyricIndex = -1;
+            g_needScrollToLyric = false;
 
-        std::vector<unsigned char> jpegData = ConvertImageToJPEG(rawAlbumData);
-        if (!jpegData.empty()) {
-            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, jpegData, PlayMusicLongMs);
-        }
-        else {
-            UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, rawAlbumData, PlayMusicLongMs);
-        }
-    }
-    else {
-        UpdateSMTC(MusicMeta.title, MusicMeta.artist, MusicMeta.album, {}, PlayMusicLongMs);
-    }
+            // 时长（后端 load 后再刷新）
+            PlayMusicLongMs = r.durationMs > 0 ? r.durationMs : 1;
+            PlayMusicLong = PlayMusicLongMs / 1000.0f;
 
-    // ==========================================
-    // 5. 异步处理 UI 封面 (带淡入淡出)
-    // ==========================================
-    if (!rawAlbumData.empty()) {
-        OutputDebugStringA(("[PlayLocalFile] raw album art size=" + std::to_string(rawAlbumData.size()) + "\n").c_str());
-        std::string title = MusicMeta.title;
-        std::string artist = MusicMeta.artist;
-        std::string album = MusicMeta.album;
-        std::vector<unsigned char> rawDataCopy = rawAlbumData;
+            // 异步 UI 封面（保持原逻辑）
+            int taskId = ++g_AsyncTaskId_search;
+            if (!r.albumArt.empty()) {
+                auto raw = r.albumArt;
+                std::string t = r.title, a = r.artist, al = r.album;
+                std::thread([raw, t, a, al, taskId]() {
+                    if (taskId != g_AsyncTaskId_search) return;
+                    auto proc = ProcessAlbumArtWithGradient(raw, 230, 230);
+                    if (proc.empty() || taskId != g_AsyncTaskId_search) return;
+                    auto* result = new AlbumArtAsyncResult();
+                    result->width = 230;
+                    result->height = 230;
+                    result->rgbaData = std::move(proc);
+                    result->rawData = raw;
+                    result->title = t;
+                    result->artist = a;
+                    result->album = al;
+                    result->targetIndex = taskId;
+                    PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0,
+                        reinterpret_cast<LPARAM>(result));
+                    }).detach();
+            }
+            else {
+                auto* emptyResult = new AlbumArtAsyncResult();
+                emptyResult->targetIndex = taskId;
+                PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0,
+                    reinterpret_cast<LPARAM>(emptyResult));
+            }
 
-        std::thread([rawDataCopy, title, artist, album, currentTaskId]() {
-            if (currentTaskId != g_AsyncTaskId_search) return;
-
-            std::vector<unsigned char> processedForUI = ProcessAlbumArtWithGradient(rawDataCopy, 230, 230);
-            if (processedForUI.empty()) return;
-
-            if (currentTaskId != g_AsyncTaskId_search) return;
-
-            AlbumArtAsyncResult* result = new AlbumArtAsyncResult();
-            result->width = 230;
-            result->height = 230;
-            result->rgbaData = std::move(processedForUI);
-            result->rawData = rawDataCopy;
-            result->title = title;
-            result->artist = artist;
-            result->album = album;
-            result->targetIndex = currentTaskId;
-            PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(result));
-            }).detach();
-    }
-    else {
-        AlbumArtAsyncResult* emptyResult = new AlbumArtAsyncResult();
-        emptyResult->targetIndex = currentTaskId;
-        PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(emptyResult));
-    }
-
-    // ==========================================
-    // 6. 启动播放并发送 AMLL 消息
-    // ==========================================
-    SetSMTCPlaybackStatus(PlaybackStatus::Playing);
-
-    if (!g_sonos_connect) {
-        ma_sound_start(&g_CurrentSound);
-        g_IsSoundLoaded = true;
-    }
-
-    std::string id1 = "t0";
-    std::string id2 = "al0";
-    std::string id3 = "ar0";
-    std::vector<Artist> artists = { {id3, MusicMeta.artist} };
-    if (amllplayer) {
-        amllplayer->sendMusicInfo(id1, MusicMeta.title, id2, MusicMeta.album, artists, PlayMusicLongMs);
-        if (!amllCoverData.empty()) {
-            std::string jpegUriData = amllplayer->imageToDataURI(amllCoverData, "image/jpeg");
-            amllplayer->sendAlbumCoverByURI(jpegUriData);
-        }
-        amllplayer->sendLyricFromLRC(orginal_lrc, g_enable_lyric_translate_split);
-    }
+            // ★ 发起后端 Load（taskId 存到全局，供 BackendLoaded 比对）
+            if (auto* be = ActiveBackend()) {
+                g_latestLoadTask = be->RequestLoad(r.widePath, r.trackIndex);
+            }
+        },
+        CallbackThread::Main);
 }
 
 // 返回空字符串代表失败，成功返回真实的本地绝对路径
@@ -1257,28 +1203,16 @@ void PlayMusicFile(int index) {
 
     g_loading_music = true;
     SetStatus(STATUS_FETCHING_URL);
-
-    if (g_IsSoundLoaded) {
-        ma_sound_stop(&g_CurrentSound);
-        ma_sound_uninit(&g_CurrentSound);
-        g_IsSoundLoaded = false;
-    }
     g_scrollBlockCounter = 0;
 
     CurrentIndex = index;
     g_source->SaveIndex(index);
 
-    int currentTaskId = ++g_AsyncTaskId_download;
-
-    std::thread([index, currentTaskId]() {
+    std::thread([index]() {
         // 1. 获取信息
         PlaybackInfo info = g_source->PreparePlayback(index);
-
-        if (currentTaskId != g_AsyncTaskId_download) return;
-
         if (!info.isValid) {
             AsyncPlayResult errorRes;
-            errorRes.taskId = currentTaskId;
             errorRes.success = false;
             errorRes.errorMsg = "获取播放信息失败";
             PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(errorRes));
@@ -1287,23 +1221,20 @@ void PlayMusicFile(int index) {
 
         // 2. 统一下载（本地直接返回路径，在线下载+打标签）
         std::string finalLocalPath = DownloadAndProcessTrack(info);
-
-        if (currentTaskId != g_AsyncTaskId_download) return;
-
-        // 3. 通知主线程播放
-        AsyncPlayResult result;
-        result.taskId = currentTaskId;
-        result.index = index;
         if (finalLocalPath.empty()) {
-            result.success = false;
-            result.errorMsg = "下载或处理失败";
-            PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(result));
+            AsyncPlayResult errorRes;
+            errorRes.success = false;
+            errorRes.errorMsg = "下载或处理失败";
+            PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(errorRes));
+            return;
         }
-        else {
-            result.success = true;
-            result.localPath = finalLocalPath;
-            PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
-        }
+
+        // 3. 通知主线程发起播放
+        AsyncPlayResult result;
+        result.success = true;
+        result.index = index;
+        result.localPath = finalLocalPath;
+        PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
         }).detach();
 }
 
@@ -1541,56 +1472,41 @@ int Destroy(HWND hWnd) {
         }
     }
 
-    // ── 跨平台清理 ──
-    if (g_IsSoundLoaded) {
-        ma_sound_uninit(&g_CurrentSound);
-    }
+    // ★ 一行清理所有后端（内部会 StopWorker + 关 ma_engine + stop Sonos）
+    PlaybackBackendRegistry::GetInstance().ShutdownAll();
+
+    // ★ 停掉事件 worker
+    AsyncEventManager::GetInstance().Stop();
+
     if (MusicMeta.albumArtSRV) {
-		ReleaseTexture(MusicMeta.albumArtSRV);
+        ReleaseTexture(MusicMeta.albumArtSRV);
         MusicMeta.albumArtSRV = nullptr;
     }
     StopWindowTimer(hWnd, g_animTimer);
-    std::filesystem::remove(coverPath);          // ← 替代 DeleteFileW
-    ma_engine_uninit(&g_AudioEngine);
-    CleanupNetwork();                            // ← 见下方
-
-    // ── 平台清理 ──
+    std::filesystem::remove(coverPath);
+    CleanupNetwork();
     UnregisterSessionNotification();
     UnregisterAllHotkeys();
-
     RequestQuitProgram();
-
     return 0;
 }
+
 bool ChangePlayMode() {
-    if (IsPlaying == false) {
-        if (!g_sonos_connect) {
-            ma_sound_start(&g_CurrentSound);
-        }
-        else {
-            g_sonos->GetPlayer()->Play();
-        }
+    auto* be = ActiveBackend();
+    if (!be) return IsPlaying;
+
+    if (!IsPlaying) {
+        g_latestPlayTask = be->RequestPlay(CurrentIndex);
+        // IsPlaying 由 BackendPlayed 事件设置（保持原逻辑），这里乐观设置避免 UI 闪烁
         IsPlaying = true;
-        if (amllplayer) {
-            amllplayer->sendResumed();
-        }
     }
     else {
-        if (!g_sonos_connect) {
-            ma_sound_stop(&g_CurrentSound);
-        }
-        else {
-            g_sonos->GetPlayer()->Pause();
-        }
+        be->RequestPause(CurrentIndex);
         IsPlaying = false;
-        if (amllplayer) {
-            amllplayer->sendPaused();
-        }
     }
-    SetSMTCPlaybackStatus(IsPlaying ? PlaybackStatus::Playing : PlaybackStatus::Paused);
-
     return IsPlaying;
 }
+
 void AutoPlayNextSong() {
     if (!g_source) return;
     size_t trackCount = g_source->GetCount();
@@ -1653,25 +1569,24 @@ uint32_t GetIconColorForTheme(const std::string& mode) {
 }
 
 void OnReadyPlay(AsyncPlayResult* result) {
-    if (result->taskId != g_AsyncTaskId_download) {
-        delete result;
-        return;
-    }
+    if (!result) return;
 
     if (result->success) {
-        // ★ 主线程更新 UI 的当前索引
         CurrentIndex = result->index;
-        // ★ 底层只负责放音
+
+        // ★ 全异步流程入口：PreLoad → BackendLoaded → BackendPlayed
+        //   注意：这里【不清】g_loading_music
         PlayLocalFile(result->localPath);
     }
     else {
         OutputDebugStringA(("播放失败: " + result->errorMsg + "\n").c_str());
+        g_loading_music = false;   // 失败立刻清
     }
 
     delete result;
-    g_loading_music = false;
 }
 void OnPlayFailed(AsyncPlayResult* result) {
+    if (!result) return;
     OutputDebugStringA(("准备失败: " + result->errorMsg + "\n").c_str());
     g_loading_music = false;
     delete result;
@@ -1791,11 +1706,6 @@ void OnAnimationTick() {
     SetWindowAlpha(g_hWnd, alpha);
     g_currentAlpha = alpha;
 }
-void OnSonosStopped() {
-    if (g_sonos_connect && IsPlaying) {
-        AutoPlayNextSong();
-    }
-}
 // ═══════════════════════════════════════════════════════════
 // 业务消息分发（跨平台，WndProc 和 LnxProc 都调它）
 // ═══════════════════════════════════════════════════════════
@@ -1831,9 +1741,6 @@ bool HandleAppMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
         OnMediaPrev();
         return true;
 
-    case WM_SONOS_STOPPED:
-        OnSonosStopped();
-        return true;
 
     case WM_TIMER:
         if (wParam == 12345 && g_isAnimating) {
@@ -2006,50 +1913,44 @@ std::string FormatTime(ma_uint64 milliseconds) {//转换时间为mm:ss的辅助�
 }
 
 bool seek(float seekRatio) {
-    seekRatio = std::clamp(seekRatio, 0.0f, 1.0f);
+    auto* be = ActiveBackend();
+    if (!be || !be->IsLoaded()) return false;
 
-    // 执行 Seek（使用毫秒）
-    if (!g_sonos_connect) {
-        if (g_IsSoundLoaded && g_TotalPCMFrames > 0) {
-            ma_uint64 targetFrame = (ma_uint64)(seekRatio * g_TotalPCMFrames);
-            PlayCurrentMs = PlayMusicLongMs * seekRatio;
-            if (ma_sound_seek_to_pcm_frame(&g_CurrentSound, targetFrame) != MA_SUCCESS) {
-                OutputDebugStringA("Seek to PCM Frame Failed!\n");
-                return false;
-            }
-            return true;
+    seekRatio = std::clamp(seekRatio, 0.0f, 1.0f);
+    uint64_t posMs = (uint64_t)(PlayMusicLongMs * seekRatio);
+
+    be->RequestSeek(posMs);
+
+    // 乐观更新 UI（后端 Seeked 事件会再刷新）
+    PlayCurrentMs = posMs;
+    PlayProgressPercent = seekRatio;
+    return true;
+}
+
+static void RegisterPlaybackSystems() {
+    PlaybackBackendRegistry::GetInstance().Register(
+        { "miniaudio", "本机扬声器", CreateMiniaudioBackend });
+    PlaybackBackendRegistry::GetInstance().Register(
+        { "sonos",     "Sonos 音响", CreateSonosBackend });
+}
+
+static bool InitPlaybackBackend() {
+    std::string id = cfg.GetValue<std::string>("playback_backend", "miniaudio");
+    if (!PlaybackBackendRegistry::GetInstance().Activate(id)) {
+        if (!PlaybackBackendRegistry::GetInstance().Activate("miniaudio")) {
+            ShowMessageBox("错误", "播放后端初始化失败");
+            return false;
         }
     }
-    else {
-        g_sonos->SetPlayPos(PlayMusicLongMs * seekRatio);
-        return true;
-    }
+    return true;
 }
 
-void ConnectAMLL() {
-    if (amllplayer) return; // 已经连接
-    // 使用你自己的 WebSocket 地址（可从配置读取或硬编码）
-    std::string address = cfg.GetValue<std::string>("amll_address", "ws://localhost:11444");
-    amllplayer = new AMLLWebSocketClient(address);
-    amllplayer->start();
-    OutputDebugStringA("AMLL 连接已启动\n");
-}
-
-void DisconnectAMLL() {
-    if (!amllplayer) return;
-    amllplayer->stop();      // 内部会停止线程并关闭 WebSocket
-    delete amllplayer;
-    amllplayer = nullptr;
-    OutputDebugStringA("AMLL 连接已关闭\n");
-}
-
-
-bool InitPlayerEngine() {
-    if (ma_engine_init(NULL, &g_AudioEngine) != MA_SUCCESS) {
-        OutputDebugStringA("音频引擎初始化失败\n");
-        ShowMessageBox("错误", "音频引擎初始化失败");
-        return false;
-    }
+static bool SwitchPlaybackBackend(const std::string& id) {
+    auto& reg = PlaybackBackendRegistry::GetInstance();
+    if (reg.ActiveId() == id) return true;
+    if (!reg.Activate(id)) return false;
+    cfg.SetValue("playback_backend", id);
+    cfg.Save();
     return true;
 }
 
@@ -2172,7 +2073,144 @@ void InitUserCookie() {
     }
 }
 
+static void RegisterAsyncHooks() {
+    auto& em = AsyncEventManager::GetInstance();
 
+    // ── 全局兜底：任何事件失败都打日志 ──
+    em.SetGlobalFallback([](AsyncEventPayload& p, const std::string& reason) {
+        OutputDebugStringA(("[AsyncFallback] " + reason +
+            " track=" + std::to_string(p.trackIndex) + "\n").c_str());
+        });
+
+    // ═══════════════════════════════════════════════════════
+    // PreLoad：读元数据 / 歌词 / 封面（worker 线程执行）
+    // ═══════════════════════════════════════════════════════
+    em.Subscribe(AsyncEventType::PreLoad,
+        [](AsyncEventPayload& p) -> EventOutcome {
+            if (p.widePath.empty()) return EventOutcome::Failed;
+
+            // 元数据
+            auto meta = GetMusicMetadata(p.filePathUtf8);
+            p.title = meta.title;
+            p.artist = meta.artist;
+            p.album = meta.album;
+
+            // 歌词（ID3 优先，其次 .lrc）
+            std::string lrc = GetLyricsFromFile(p.widePath);
+            if (lrc.empty()) {
+                PathType lp = FindLrcFile(p.widePath);
+                if (!lp.empty()) {
+                    lrc = ReadTextFile(lp);
+                    if (lrc.size() >= 3 &&
+                        (unsigned char)lrc[0] == 0xEF &&
+                        (unsigned char)lrc[1] == 0xBB &&
+                        (unsigned char)lrc[2] == 0xBF) {
+                        lrc = lrc.substr(3);
+                    }
+                }
+            }
+            p.lyrics = lrc;
+            p.albumArt = ExtractAlbumArt(p.widePath);
+            return EventOutcome::Handled;
+        });
+
+    // ═══════════════════════════════════════════════════════
+    // BackendLoaded：后端加载成功 → 发起播放
+    // ═══════════════════════════════════════════════════════
+    em.Subscribe(AsyncEventType::BackendLoaded,
+        [](AsyncEventPayload& p) -> EventOutcome {
+            if (p.extraInt != g_latestLoadTask) return EventOutcome::Skipped;
+
+            if (auto* be = ActiveBackend()) {
+                g_latestPlayTask = be->RequestPlay(p.trackIndex);
+            }
+            return EventOutcome::Handled;
+        });
+
+    // ═══════════════════════════════════════════════════════
+    // BackendPlayed：后端启动播放
+    // ═══════════════════════════════════════════════════════
+    em.Subscribe(AsyncEventType::BackendPlayed, [](AsyncEventPayload& p) -> EventOutcome {
+        if (p.extraInt != g_latestPlayTask) return EventOutcome::Skipped;
+        IsPlaying = true;
+        g_loading_music = false;
+        PlayCurrentMs = p.positionMs;
+        PlayMusicLongMs = p.durationMs > 0 ? p.durationMs : PlayMusicLongMs;
+
+        // ★ 回填 PreLoad 阶段拿到的元数据
+        p.title = g_curTitle;
+        p.artist = g_curArtist;
+        p.album = g_curAlbum;
+        p.lyrics = g_curLyrics;
+        p.albumArt = g_curAlbumArt;
+        if (p.durationMs == 0) p.durationMs = PlayMusicLongMs;
+
+        AsyncEventManager::GetInstance().Post(AsyncEventType::PostPlay, p);
+        return EventOutcome::Handled;
+        });
+
+    // ═══════════════════════════════════════════════════════
+    // BackendLoadFailed：加载失败 → UI 提示 + 状态复位
+    // ═══════════════════════════════════════════════════════
+    em.Subscribe(AsyncEventType::BackendLoadFailed,
+        [](AsyncEventPayload& p) -> EventOutcome {
+            if (p.extraInt != g_latestLoadTask) return EventOutcome::Skipped;
+            OutputDebugStringA(("[LoadFailed] " + p.errorMsg + "\n").c_str());
+            g_loading_music = false;
+            return EventOutcome::Handled;
+        });
+
+    // ═══════════════════════════════════════════════════════
+    // BackendEnded：自然结束 → 自动下一首
+    // ═══════════════════════════════════════════════════════
+    em.Subscribe(AsyncEventType::BackendEnded,
+        [](AsyncEventPayload&) -> EventOutcome {
+            AutoPlayNextSong();
+            return EventOutcome::Handled;
+        });
+
+    em.Subscribe(AsyncEventType::ExternalTogglePlay,
+        [](AsyncEventPayload&) -> EventOutcome { ChangePlayMode(); return EventOutcome::Handled; });
+
+    em.Subscribe(AsyncEventType::ExternalNext,
+        [](AsyncEventPayload&) -> EventOutcome { OnMediaNext(); return EventOutcome::Handled; });
+
+    em.Subscribe(AsyncEventType::ExternalPrev,
+        [](AsyncEventPayload&) -> EventOutcome { OnMediaPrev(); return EventOutcome::Handled; });
+
+    em.Subscribe(AsyncEventType::ExternalSeek,
+        [](AsyncEventPayload& p) -> EventOutcome {
+            double ratio = (double)p.positionMs / PlayMusicLongMs;
+            seek((float)std::clamp(ratio, 0.0, 1.0));
+            return EventOutcome::Handled;
+        });
+
+
+}
+
+static void RegisterServices() {
+    auto& reg = PlaybackServiceRegistry::GetInstance();
+
+    // ★ SMTC：静默服务，永远启用，不在菜单显示
+    reg.Register({
+        "smtc",
+        "系统媒体控制",
+        "",            // configKey 留空（不需要持久化）
+        true,          // defaultEnabled（被 userConfigurable=false 覆盖）
+        CreateSmtcService,
+        false          // ★ userConfigurable = false
+        });
+
+    // ★ AMLL：可选服务，首次关闭，用户主动开
+    reg.Register({
+        "amll",
+        "AMLL 歌词同步",
+        "service_amll_enabled",
+        false,         // ★ defaultEnabled = false（首次不启用）
+        CreateAMLLService,
+        true           // userConfigurable = true
+        });
+}
 void RenderFrame(int counter,SettingWindow& settings) {
     ImGui::NewFrame();
     ImGuiIO& io = ImGui::GetIO();
@@ -2360,28 +2398,20 @@ void RenderFrame(int counter,SettingWindow& settings) {
             }
             ImGui::EndListBox();
         }
-        if (!g_sonos_connect) {
-            ma_uint64 currentMs = ma_sound_get_time_in_milliseconds(&g_CurrentSound);
-            PlayCurrentMs = currentMs;
+        // ★ 进度条更新：从当前活跃后端读
+        if (auto* be = ActiveBackend(); be && be->IsLoaded()) {
+            PlayCurrentMs = be->GetPositionMs();
             if (PlayMusicLongMs > 0) {
-                PlayProgressPercent = (float)PlayCurrentMs / (float)PlayMusicLongMs;
-                if (PlayProgressPercent > 1.0f) PlayProgressPercent = 1.0f;
+                PlayProgressPercent = std::clamp(
+                    (float)PlayCurrentMs / (float)PlayMusicLongMs, 0.0f, 1.0f);
             }
             else {
                 PlayProgressPercent = 0.0f;
             }
         }
-        else {
-            if ((counter % 10 == 0) && g_loading_music == false && IsPlaying == true) {
-                PlayCurrentMs = g_sonos->GetPosition();
-                PlayProgressPercent = (float)PlayCurrentMs / (float)PlayMusicLongMs;
-                if (PlayProgressPercent > 1.0f) PlayProgressPercent = 1.0f;
-                if (PlayProgressPercent < 0.0f) PlayProgressPercent = 0.0f;
-                if (PlayCurrentMs > PlayMusicLongMs * 1.5) { PlayCurrentMs = 0; }
-            }
-            else if (g_loading_music) {
-                PlayCurrentMs = 0;
-            }
+        else if (g_loading_music) {
+            PlayCurrentMs = 0;
+            PlayProgressPercent = 0.0f;
         }
         //if (g_pTaskbarList && g_hWnd && counter == 0) {
         //    if (PlayCurrentMs > 0) {
@@ -2470,16 +2500,49 @@ void RenderFrame(int counter,SettingWindow& settings) {
             ImGui::Text("额外设置");
             ImGui::Separator();
 
-            if (ImGui::MenuItem("打开AMLL连接", NULL, g_AMLL_connect)) {
-                g_AMLL_connect = !g_AMLL_connect;
-                if (g_AMLL_connect == true) {
-                    ConnectAMLL();
+            if (ImGui::BeginMenu("服务")) {
+                auto& sreg = PlaybackServiceRegistry::GetInstance();
+                const auto& descriptors = sreg.GetDescriptors();
+
+                if (descriptors.empty()) {
+                    ImGui::MenuItem("(无可用服务)", NULL, false, false);
                 }
                 else {
-                    DisconnectAMLL();
-                }
+                    for (const auto& d : descriptors) {
+                        bool enabled = sreg.IsEnabled(d.id);
+                        bool clickable = d.userConfigurable;   // ★ 可点性
 
-            }if (ImGui::MenuItem("打开Sonos连接窗口", NULL)) {
+                        // ★ 标签补充说明
+                        std::string label = d.displayName;
+                        if (!clickable) {
+                            label += "  (内置)";
+                        }
+                        else if (enabled && d.id == "amll") {
+                            label += "  (已连接)";
+                        }
+
+                        // ★ 第 4 个参数 enabled 控制是否可点：
+                        //   true  → 正常可点
+                        //   false → 灰色不可点
+                        if (ImGui::MenuItem(label.c_str(), NULL, enabled, clickable)) {
+                            if (enabled) sreg.Disable(d.id);
+                            else         sreg.Enable(d.id);
+                        }
+
+                        if (ImGui::IsItemHovered()) {
+                            if (!clickable) {
+                                ImGui::SetTooltip("始终启用");
+                            }
+                            else {
+                                ImGui::SetTooltip("ID: %s", d.id.c_str());
+                            }
+                        }
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::MenuItem("打开Sonos连接窗口", NULL)) {
                 s_open_sonos_search_window = !s_open_sonos_search_window;
             }
 
@@ -2503,84 +2566,87 @@ void RenderFrame(int counter,SettingWindow& settings) {
         settings.setSource(g_source.get());
         settings.render();
         if (s_open_sonos_search_window) {
-            ImGui::SetNextWindowSize(ImVec2(450, 350), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("Sonos 控制", &s_open_sonos_search_window, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+            ImGui::SetNextWindowSize(ImVec2(450, 400), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin("Sonos 控制", &s_open_sonos_search_window,
+                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+            {
+                auto& reg = PlaybackBackendRegistry::GetInstance();
+                auto* sonos = reg.GetOrCreate("sonos");
 
-                // 初始化控制器（只做一次）
-
-
-                ImGui::Text("播放设备控制");
-                ImGui::Separator();
-
-                // ---------- 搜索按钮 ----------
-                if (ImGui::Button("搜索设备") && !g_sonos_searching) {
-                    g_devices.clear();
-                    g_selectedDevice = -1;
-                    g_sonos_connect = false;
-
-                    // 启动异步搜索
-                    g_searchFuture = std::async(std::launch::async, []() {
-                        SonosController ctrl;   // 每个线程独立控制器，避免共享状态问题
-                        ctrl.Initialize();
-                        return ctrl.SearchDevices();
-                        });
-                    g_sonos_searching = true;
+                if (!sonos || !sonos->SupportsDeviceManagement()) {
+                    ImGui::TextColored(ImVec4(1, 0, 0, 1), "Sonos 后端不可用");
+                    ImGui::End();
                 }
-                ImGui::SameLine();
-                if (ImGui::Button("回到本机播放") && !g_sonos_searching) {
-                    g_selectedDevice = -1;
-                    g_sonos_connect = false;
-                }
+                else {
+                    ImGui::Text("播放设备控制");
+                    ImGui::Separator();
 
-                // ---------- 处理搜索结果 ----------
-                if (g_sonos_searching) {
-                    // 非阻塞检查是否完成
-                    if (g_searchFuture.valid() &&
-                        g_searchFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-                        g_devices = g_searchFuture.get();
-                        g_sonos_searching = false;
+                    // 搜索按钮
+                    if (sonos->IsSearchingDevices()) {
+                        ImGui::BeginDisabled();
+                        ImGui::Button("搜索中...");
+                        ImGui::EndDisabled();
                     }
                     else {
-                        ImGui::Text("正在搜索... (请稍候)");
+                        if (ImGui::Button("搜索设备")) sonos->StartDeviceSearch();
                     }
-                }
+                    ImGui::SameLine();
+                    if (ImGui::Button("回到本机播放")) {
+                        SwitchPlaybackBackend("miniaudio");
+                    }
 
-                // ---------- 设备列表 ----------
-                if (!g_devices.empty()) {
-                    ImGui::Text("发现 %d 个设备:", (int)(g_devices.size()));
-                    ImGui::BeginChild("DeviceList", ImVec2(0, 60), true);
-                    for (size_t i = 0; i < g_devices.size(); i++) {
-                        if (ImGui::Selectable(g_devices[i].friendlyName.c_str(), g_selectedDevice == i)) {
-                            g_selectedDevice = (int)i;
+                    // 拉新结果
+                    auto newDevices = sonos->PollFoundDevices();
+                    if (!newDevices.empty()) {
+                        s_cachedSonosDevices = std::move(newDevices);
+                        s_selectedSonosDeviceIdx = -1;
+                    }
+
+                    // 设备列表
+                    if (sonos->IsSearchingDevices()) {
+                        ImGui::Text("正在搜索...");
+                    }
+                    else if (!s_cachedSonosDevices.empty()) {
+                        ImGui::Text("发现 %d 个设备:", (int)s_cachedSonosDevices.size());
+                        ImGui::BeginChild("DeviceList", ImVec2(0, 100), true);
+                        for (size_t i = 0; i < s_cachedSonosDevices.size(); ++i) {
+                            bool sel = (s_selectedSonosDeviceIdx == (int)i);
+                            if (ImGui::Selectable(s_cachedSonosDevices[i].displayName.c_str(), sel))
+                                s_selectedSonosDeviceIdx = (int)i;
                         }
-                    }
-                    ImGui::EndChild();
+                        ImGui::EndChild();
 
-                    // ---------- 连接按钮 ----------
-                    if (g_selectedDevice >= 0 && !g_sonos_connect) {
-                        if (ImGui::Button("连接此设备")) {
-                            if (g_sonos->ConnectToDevice(g_devices[g_selectedDevice].location)) {
-                                g_sonos_connect = true;
-                                ImGui::TextColored(ImVec4(0, 1, 0, 1), "连接成功！");
+                        if (s_selectedSonosDeviceIdx >= 0 &&
+                            s_selectedSonosDeviceIdx < (int)s_cachedSonosDevices.size()) {
 
+                            if (!sonos->IsDeviceConnected()) {
+                                if (ImGui::Button("连接此设备")) {
+                                    if (sonos->ConnectToDevice(
+                                        s_cachedSonosDevices[s_selectedSonosDeviceIdx].location)) {
+                                        SwitchPlaybackBackend("sonos");
+                                        ImGui::TextColored(ImVec4(0, 1, 0, 1), "连接成功！");
+                                    }
+                                    else {
+                                        ImGui::TextColored(ImVec4(1, 0, 0, 1), "连接失败！");
+                                    }
+                                }
                             }
                             else {
-                                ImGui::TextColored(ImVec4(1, 0, 0, 1), "连接失败！");
+                                ImGui::TextColored(ImVec4(0, 1, 0, 1), "已连接");
                             }
                         }
                     }
-                }
-                else if (!g_sonos_searching) {
-                    ImGui::Text("尚未搜索或未发现设备。");
-                }
+                    else {
+                        ImGui::Text("尚未搜索或未发现设备。");
+                    }
 
-                // ---------- 播放控制（连接后）----------
-                if (g_sonos_connect) {
-                    ImGui::Separator();
-                    ImGui::Text("音响已连接，回到主界面以播放音乐");
-                }
+                    if (sonos->IsDeviceConnected() && reg.ActiveId() == "sonos") {
+                        ImGui::Separator();
+                        ImGui::Text("音响正在播放");
+                    }
 
-                ImGui::End();
+                    ImGui::End();
+                }
             }
         }
         if (g_netease_account_login_window_status) {
@@ -3006,14 +3072,7 @@ void RenderFrame(int counter,SettingWindow& settings) {
     // 渲染 D3D11
     ImGui::Render();
 }
-void StartSearchSonos() {
-    g_searchFuture = std::async(std::launch::async, []() {
-        SonosController ctrl;   // 每个线程独立控制器，避免共享状态问题
-        ctrl.Initialize();
-        return ctrl.SearchDevices();
-        });
-    g_sonos_searching = true;
-}
+
 #if PLATFORM_WINDOWS
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -3040,6 +3099,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ReadConfig();
 
     RegisterMusicSources();
+    RegisterPlaybackSystems();     // ★ 新增：注册后端
+    RegisterAsyncHooks();          // ★ 新增：注册事件订阅
+    RegisterServices();
+    AsyncEventManager::GetInstance().Start();   // ★ 启动 worker
+    PlaybackServiceRegistry::GetInstance().EnableDefaults();//启动服务
+
     if (!g_apiAddr.empty() && g_online_player) {
         NeteaseAPIManager::GetInstance().SetBaseURL(g_apiAddr);
     }
@@ -3047,17 +3112,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ShowMessageBox("退出", "未配置网易云歌单ID或API地址配置错误（有可能已经失效），程序将退出");
         PostMessage(g_hWnd, WM_CLOSE, 0, 0);
     }
-    if (!g_sonos) {
-        g_sonos = std::make_unique<SonosController>();
-        g_sonos->Initialize();
-    }
     srand(time(NULL));
     if (FAILED(hr)) {
         // 如果设置失败，可以输出调试信息，但不影响程序继续运行
         OutputDebugString(L"Failed to set AppUserModelID\n");
     }
     initMusicList();//音乐源在这里初始化
-    if (!InitPlayerEngine())return 1;
+    if (!InitPlaybackBackend()) return 1;  
     try { winrt::init_apartment(); }//winrt初始化
     catch (...) { OutputDebugStringA("winrt没有初始化\n"); }
     InitUserCookie();
@@ -3074,7 +3135,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // IconManager::GetInstance().SetThemeColor(g_iconColor); 
     }
     UpdateCurrentPlaying(CurrentIndex);
-    StartSearchSonos();
     InitTaskbarProgress(g_hWnd);
     IconManager::GetInstance().Initialize();
     IconManager::GetInstance().SetThemeColor(g_iconColor);
@@ -3083,6 +3143,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     GetWindowRect(g_hWnd, &rc);
     g_normalWidth = rc.right - rc.left;
     g_normalHeight = rc.bottom - rc.top;
+
 
     int counter = 0;
     MSG msg{};
@@ -3093,6 +3154,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DispatchMessage(&msg);
             continue;
         }
+        AsyncEventManager::GetInstance().DrainMainThread();
         if (g_needUpdateStyle) {
             g_iconCache.clear();
             ApplyTheme(g_dark_mode, g_opacity);
@@ -3104,35 +3166,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // 如果主题里涉及背景图，也可以在这里重新加载
             // ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
         }
-        if (!g_loading_music) {
-            if (ma_sound_at_end(&g_CurrentSound) == MA_TRUE && IsPlaying == true && !g_sonos_connect) {
-                ma_sound_stop(&g_CurrentSound);
-                AutoPlayNextSong();
-            }
-            /*else if (g_sonos_connect && IsPlaying == true && PlayCurrentMs >= PlayMusicLongMs - 100) {
-                AutoPlayNextSong();
-            }*/
-            //else if (g_sonos_connect && IsPlaying) {
-            //    if (counter == 30) {
-            //        static int range_time = 0;
-            //        range_time++;
-            //        if (range_time >= 10) {
-            //            range_time = 0;
-            //        }
-            //        auto player = g_sonos->GetPlayer();
-            //        if (player) {
-            //            SONOS::ElementList vars;
-            //            if (player->GetTransportInfo(vars)) {
-            //                std::string state = vars.GetValue("CurrentTransportState");
-            //                if (state == "STOPPED" || state == "PAUSED_PLAYBACK") {
-            //                    AutoPlayNextSong();
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
-        }
-        if ((g_IsSoundLoaded && !g_lyrics.empty()) || (g_sonos_connect == true && g_loading_music == false && !g_lyrics.empty())) {
+        if (ActiveBackend() && ActiveBackend()->IsLoaded() && !g_lyrics.empty()) {
             ma_uint64 currentMs = PlayCurrentMs;
             // 找到最后一个时间 <= currentMs 的行
             int newIndex = -1;
@@ -3154,46 +3188,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (counter >= 60) {
             counter = 0;
         }
-        // 大约每 1 秒更新一次即可，太频繁会卡
-        if (counter % 60 == 0 && g_IsSoundLoaded) {
-            UpdateSMTCProgress(PlayCurrentMs);
-        }
+
         if (g_scrollBlockCounter > 0) {
             g_scrollBlockCounter--;
         }
-        if (amllplayer && counter == 0) {
-            amllplayer->sendProgress(PlayCurrentMs);
-            if (IsPlaying == false) {
-                amllplayer->sendPaused();
-            }
-            else {
-                amllplayer->sendResumed();
-            }
-        }
-        if (amllplayer && counter == 0) {
-            AMLLCommand cmd = amllplayer->getNextCommand();
-            switch (cmd) {
-            case AMLLCommand::Pause:    ChangePlayMode(); break;
-            case AMLLCommand::Resume:   ChangePlayMode(); break;
-            case AMLLCommand::Forward:
-                CurrentIndex++;
-                UpdateCurrentPlaying(CurrentIndex);
-                break;   // 你定义的函数
-            case AMLLCommand::Backward:
-                CurrentIndex--;
-                UpdateCurrentPlaying(CurrentIndex);
-                break;
-            case AMLLCommand::Seek: {
-                uint64_t seekPos = amllplayer->getPendingSeek();
-                if (seekPos == UINT64_MAX) break;   // 没有待处理的 seek
-                double ratio = static_cast<double>(seekPos) / PlayMusicLongMs;
-                if (ratio < 0.0) ratio = 0.0;
-                if (ratio > 1.0) ratio = 1.0;
-                OutputDebugStringA(("AMLL-seek-ratio: " + std::to_string(ratio) + "\n").c_str());
-                seek(ratio);
-                break;
-            }
-            }
+        if (counter % 60 == 0) {   // 每秒一次
+            PlaybackServiceRegistry::GetInstance().Tick(PlayCurrentMs, IsPlaying);
         }
         
         if (!g_pd3dDevice || !g_pSwapChain || !g_mainRenderTargetView || !g_pd3dDeviceContext)
@@ -3202,6 +3202,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
+
         if (g_isWindowHidden && !g_isAnimating) {
             // 隐藏且无动画时限制帧率
             static auto lastRender = std::chrono::steady_clock::now();
@@ -3213,8 +3214,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             lastRender = now;
         }
-
-
 
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
