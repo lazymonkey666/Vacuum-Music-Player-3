@@ -381,6 +381,7 @@ public:
 
 private:
     void BuildSourceCategories();      // ★ 首次打开时懒构建
+    void RebuildSourceCategory();
 
     ManageConfig& cfg;
     std::vector<SettingCategory> categories_;
@@ -397,4 +398,26 @@ private:
     bool m_sourcesBuilt = false;       // 只构建一次
 
     IMusicSource* m_activeSource = nullptr;
+
+    IMusicSource* m_source = nullptr;
+    bool          m_sourceDirty = false;
+    int           m_sourceCategoryIndex = -1;
+};
+
+// 按钮设置项（点击触发回调）
+struct SettingItemButton : SettingItemBase {
+    std::string label;
+    std::function<void()> onClick;
+
+    SettingItemButton(std::string lbl, std::function<void()> cb)
+        : label(std::move(lbl)), onClick(std::move(cb)) {}
+
+    void render() override {
+        if (ImGui::Button(label.c_str())) {
+            if (onClick) onClick();
+        }
+        ImGui::Separator();
+    }
+    void save() override {}
+    void load() override {}
 };

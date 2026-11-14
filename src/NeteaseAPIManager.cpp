@@ -1,3 +1,4 @@
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "NeteaseAPIManager.h"
 #define CPPHTTPLIB_USE_WIN32_FILE_IO 0
 #include <httplib.h>
@@ -6,6 +7,38 @@
 #include <sstream>
 
 using json = nlohmann::json;
+
+// ========== 轻量级 URL 编码辅助函数 ==========
+static std::string UrlEncode(const std::string& value) {
+    std::string escaped;
+    escaped.reserve(value.size());
+    for (char c : value) {
+        // 保留字母、数字和特定安全字符，其余全部转义
+        if (isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.' || c == '~') {
+            escaped.push_back(c);
+        }
+        else {
+            char buf[4];
+            snprintf(buf, sizeof(buf), "%%%02X", static_cast<unsigned char>(c));
+            escaped.append(buf);
+        }
+    }
+    return escaped;
+}
+
+// ═══════════════════════════════════════════════════════════
+// JSON 字段安全读取（int64 防溢出 / 字符串空值兜底）
+// ═══════════════════════════════════════════════════════════
+static int64_t JInt64(const json& o, const char* k, int64_t def = 0) {
+    if (o.contains(k) && o[k].is_number()) return o[k].get<int64_t>();
+    return def;
+}
+
+static std::string JStr(const json& o, const char* k, const char* def = "") {
+    if (o.contains(k) && o[k].is_string()) return o[k].get<std::string>();
+    return def;
+}
+
 
 // ========== 单例 ==========
 NeteaseAPIManager& NeteaseAPIManager::GetInstance() {
@@ -57,13 +90,144 @@ bool NeteaseAPIManager::LoginAsGuest() {
     return false;
 }
 
-// ========== 通用请求 ==========
-json NeteaseAPIManager::Request(const std::string& path,
+// ========== 单个源发请求（内部函数）==========
+json NeteaseAPIManager::DoRequest(ApiSource source,
+    const std::string& path,
+    const std::vector<std::pair<std::string, std::string>>& params,
+    bool needUserCookie)
+{
+    // 构造 query
+    std::string query;
+    for (const auto& p : params) {
+        if (!query.empty()) query += "&";
+
+        // ★ 1. 自动适配官方与第三方对 "ids" 格式的不同要求
+        if (source == ApiSource::Official && p.first == "ids") {
+            // 官方要求 JSON 数组格式：[1,2,3]，并必须 URL 编码
+            std::string val = "[" + p.second + "]";
+            // ✅ 改为调用自定义的编码函数
+            query += p.first + "=" + UrlEncode(val);
+        }
+        else {
+            // 第三方直接传 1,2,3
+            query += p.first + "=" + p.second;
+        }
+    }
+    std::string fullPath = path + (query.empty() ? "" : "?" + query);
+
+    std::string host;
+    httplib::Headers headers;
+
+    if (source == ApiSource::Official) {
+        host = "https://music.163.com";
+        headers.emplace("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; WOW64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Safari/537.36 Chrome/91.0.4472.164 "
+            "NeteaseMusicDesktop/2.10.2.200154");
+        headers.emplace("Referer", "https://music.163.com");
+        headers.emplace("Cookie", "os=pc; appver=; osver=; deviceId=pyncm!");
+    }
+    else {
+        if (m_baseUrl.empty())
+            throw std::runtime_error("ThirdParty base URL not set");
+        host = m_baseUrl;
+        headers.emplace("User-Agent", "VacuumMusicPlayer/3.0");
+        if (needUserCookie) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            std::string cookie = !m_userCookie.empty() ? m_userCookie : m_guestCookie;
+            if (!cookie.empty()) {
+                headers.emplace("Cookie", "MUSIC_U=" + cookie + "; os=pc;");
+            }
+        }
+    }
+
+    httplib::Client cli(host);
+    cli.set_connection_timeout(5, 0);
+    cli.set_read_timeout(15, 0);
+
+    auto res = cli.Get(fullPath.c_str(), headers);
+    if (!res) throw std::runtime_error("no response");
+    if (res->status != 200) throw std::runtime_error("HTTP " + std::to_string(res->status));
+
+    json j = json::parse(res->body);
+
+    if (j.contains("code") && j["code"].is_number()) {
+        int code = j["code"].get<int>();
+        if (code != 200 && code != 0) {
+            throw std::runtime_error("business code " + std::to_string(code)
+                + ": " + j.value("message", ""));
+        }
+    }
+    return j;
+}
+
+// ========== 主备降级路由 ==========
+json NeteaseAPIManager::RequestWithRoute(
+    ApiSource primary,
+    const std::string& officialPath,
+    const std::string& thirdPartyPath,
+    const std::vector<std::pair<std::string, std::string>>& params,
+    bool needUserCookie)
+{
+    // 决策：哪个先试，哪个后试
+    ApiSource secondary = (primary == ApiSource::Official)
+        ? ApiSource::ThirdParty : ApiSource::Official;
+
+    auto trySource = [&](ApiSource src) -> std::optional<json> {
+        CircuitBreaker& circuit = (src == ApiSource::Official)
+            ? m_officialCircuit : m_thirdPartyCircuit;
+        RateLimiter& limiter = (src == ApiSource::Official)
+            ? m_officialLimiter : m_thirdPartyLimiter;
+
+        // 熔断中 → 直接跳过
+        if (circuit.IsInCooldown()) {
+            OutputDebugStringA(("[Route] " + std::string(src == ApiSource::Official ? "Official" : "ThirdParty")
+                + " in cooldown, skip\n").c_str());
+            return std::nullopt;
+        }
+
+        // 限流命中 → 跳过（不阻塞）
+        if (!limiter.TryAcquire()) {
+            OutputDebugStringA(("[Route] " + std::string(src == ApiSource::Official ? "Official" : "ThirdParty")
+                + " rate limited, skip\n").c_str());
+            return std::nullopt;
+        }
+
+        try {
+            const std::string& path = (src == ApiSource::Official)
+                ? officialPath : thirdPartyPath;
+            json result = DoRequest(src, path, params, needUserCookie);
+            circuit.OnSuccess();
+            OutputDebugStringA(("[Route] " + std::string(src == ApiSource::Official ? "Official" : "ThirdParty")
+                + " OK: " + path + "\n").c_str());
+            return result;
+        }
+        catch (const std::exception& e) {
+            circuit.OnFailure();
+            OutputDebugStringA(("[Route] " + std::string(src == ApiSource::Official ? "Official" : "ThirdParty")
+                + " FAIL: " + e.what() + "\n").c_str());
+            return std::nullopt;
+        }
+        };
+
+    // 先试主源
+    if (auto r = trySource(primary)) return *r;
+
+    // 主源失败 → 试备源
+    if (auto r = trySource(secondary)) return *r;
+
+    // 两源全挂
+    throw std::runtime_error("both sources failed for " + officialPath);
+}
+
+// ========== 兼容重载函数 ==========
+json NeteaseAPIManager::RequestThidParty(const std::string& path,
     const std::vector<std::pair<std::string, std::string>>& params,
     const httplib::Headers& extraHeaders) {
     if (m_baseUrl.empty()) throw std::runtime_error("API base URL not set");
 
-    // 构造查询字符串（锁外）
+    // 构造 query
     std::string query;
     for (const auto& p : params) {
         if (!query.empty()) query += "&";
@@ -71,26 +235,18 @@ json NeteaseAPIManager::Request(const std::string& path,
     }
     std::string fullPath = path + (query.empty() ? "" : "?" + query);
 
-    // 选择 Cookie（锁内小范围）
+    // 携带 Cookie（登录/刷新等必须）
     std::string cookieToUse;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        if (!m_userCookie.empty()) {
-            cookieToUse = m_userCookie;
-        }
-        else if (m_guestLoggedIn && !m_guestCookie.empty()) {
-            cookieToUse = m_guestCookie;
-        }
+        if (!m_userCookie.empty()) cookieToUse = m_userCookie;
+        else if (m_guestLoggedIn && !m_guestCookie.empty()) cookieToUse = m_guestCookie;
     }
-
-    // 将 Cookie 附加到 URL（或 Header）
     if (!cookieToUse.empty()) {
-        // 对 cookie 值进行 URL 编码（假设有 encode_url 函数）
         fullPath += (fullPath.find('?') == std::string::npos ? "?" : "&");
         fullPath += "cookie=MUSIC_U=" + cookieToUse + ";os=pc;";
     }
 
-    // 发起网络请求（锁外）
     httplib::Client cli(m_baseUrl);
     cli.set_connection_timeout(5, 0);
     cli.set_read_timeout(15, 0);
@@ -105,6 +261,54 @@ json NeteaseAPIManager::Request(const std::string& path,
     catch (...) {
         throw std::runtime_error("JSON 解析失败");
     }
+}
+
+// ========== 通用请求 ==========
+json NeteaseAPIManager::Request(const std::string& officialPath,
+    const std::string& thirdPartyPath,
+    const std::vector<std::pair<std::string, std::string>>& params,
+    ApiSource primary,
+    bool needUserCookie)
+{
+    ApiSource secondary = (primary == ApiSource::Official)
+        ? ApiSource::ThirdParty : ApiSource::Official;
+
+    auto trySource = [&](ApiSource src) -> std::optional<json> {
+        CircuitBreaker& circuit = (src == ApiSource::Official)
+            ? m_officialCircuit : m_thirdPartyCircuit;
+        RateLimiter& limiter = (src == ApiSource::Official)
+            ? m_officialLimiter : m_thirdPartyLimiter;
+        const char* name = (src == ApiSource::Official) ? "Official" : "ThirdParty";
+
+        // 熔断中跳过
+        if (circuit.IsInCooldown()) {
+            OutputDebugStringA(("[Route] " + std::string(name) + " cooldown, skip\n").c_str());
+            return std::nullopt;
+        }
+        // 限流命中跳过
+        if (!limiter.TryAcquire()) {
+            OutputDebugStringA(("[Route] " + std::string(name) + " rate limited, skip\n").c_str());
+            return std::nullopt;
+        }
+
+        try {
+            const std::string& path = (src == ApiSource::Official) ? officialPath : thirdPartyPath;
+            json r = DoRequest(src, path, params, needUserCookie);
+            circuit.OnSuccess();
+            OutputDebugStringA(("[Route] " + std::string(name) + " OK: " + path + "\n").c_str());
+            return r;
+        }
+        catch (const std::exception& e) {
+            circuit.OnFailure();
+            OutputDebugStringA(("[Route] " + std::string(name) + " FAIL: " + e.what() + "\n").c_str());
+            return std::nullopt;
+        }
+        };
+
+    if (auto r = trySource(primary))   return *r;
+    if (auto r = trySource(secondary)) return *r;
+
+    throw std::runtime_error("both sources failed: " + officialPath);
 }
 
 // ========== 安全读取字符串 ==========
@@ -136,12 +340,38 @@ std::vector<std::string> NeteaseAPIManager::ExtractTrackIds(const json& trackIds
 
 // ========== 获取歌单 trackIds ==========
 std::vector<std::string> NeteaseAPIManager::GetPlaylistTrackIds(int64_t playlistId) {
-    auto resp = Request("/playlist/detail", { {"id", std::to_string(playlistId)} });
-    if (resp.contains("code") && resp["code"].get<int>() != 200)
-        throw std::runtime_error("API error: " + std::to_string(resp["code"].get<int>()));
-    if (!resp.contains("playlist") || !resp["playlist"].is_object())
-        throw std::runtime_error("Invalid playlist response");
-    const auto& pl = resp["playlist"];
+    // ★ 第三方优先（私密歌单官方拿不到）
+    auto resp = RequestWithRoute(
+        ApiSource::ThirdParty,          // ← 主源改第三方
+        "/api/playlist/detail",
+        "/playlist/detail",
+        { {"id", std::to_string(playlistId)} },
+        true);                          // ★ 第三方需要用户 Cookie（私密歌单）
+
+    // 业务错误码检测
+    if (resp.contains("code") && resp["code"].is_number()) {
+        int code = resp["code"].get<int>();
+        if (code != 200 && code != 0) {
+            throw std::runtime_error("playlist API failed: code=" +
+                std::to_string(code) + " msg=" + resp.value("msg", ""));
+        }
+    }
+
+    // 兼容两种结构：result.playlist / playlist
+    const json* plPtr = nullptr;
+    if (resp.contains("result") && resp["result"].is_object()
+        && resp["result"].contains("playlist") && resp["result"]["playlist"].is_object()) {
+        plPtr = &resp["result"]["playlist"];
+    }
+    else if (resp.contains("playlist") && resp["playlist"].is_object()) {
+        plPtr = &resp["playlist"];
+    }
+
+    if (!plPtr) {
+        throw std::runtime_error("playlist detail: no valid playlist in response");
+    }
+
+    const auto& pl = *plPtr;
     if (pl.contains("trackIds") && pl["trackIds"].is_array()) {
         return ExtractTrackIds(pl["trackIds"]);
     }
@@ -151,64 +381,93 @@ std::vector<std::string> NeteaseAPIManager::GetPlaylistTrackIds(int64_t playlist
 // ========== 批量获取歌曲详情 ==========
 std::vector<NeteaseSongInfo> NeteaseAPIManager::GetSongsDetail(const std::vector<std::string>& ids) {
     if (ids.empty()) return {};
-    std::string idStr;
-    for (size_t i = 0; i < ids.size(); ++i) {
-        if (i > 0) idStr += ",";
-        idStr += ids[i];
-    }
-    auto resp = Request("/song/detail", { {"ids", idStr} });
-    if (resp.contains("code") && resp["code"].get<int>() != 200)
-        throw std::runtime_error("API error: " + std::to_string(resp["code"].get<int>()));
-    if (!resp.contains("songs") || !resp["songs"].is_array())
-        throw std::runtime_error("Missing songs array");
 
+    const size_t batchSize = 50;
     std::vector<NeteaseSongInfo> songs;
-    for (const auto& item : resp["songs"]) {
-        NeteaseSongInfo s;
-        s.id = SafeGetString(item, "id");
-        s.name = SafeGetString(item, "name", "未知歌曲");
-        s.duration = item.value("dt", 0);
-        s.fee = item.value("fee", 0);
-        if (item.contains("ar") && item["ar"].is_array()) {
-            for (const auto& ar : item["ar"]) {
-                std::string name = SafeGetString(ar, "name");
-                if (!name.empty()) s.artists.push_back(name);
+
+    for (size_t offset = 0; offset < ids.size(); offset += batchSize) {
+        size_t end = std::min(offset + batchSize, ids.size());
+        std::string idStr;
+        for (size_t i = offset; i < end; ++i) {
+            if (!idStr.empty()) idStr += ",";
+            idStr += ids[i];
+        }
+
+        // ★ 官方要 ids=[id1,id2] 带方括号
+        std::string idsParam = idStr;
+
+        auto resp = RequestWithRoute(
+            ApiSource::Official,            // ★ 官方优先
+            "/api/song/detail",
+            "/song/detail",
+            { {"ids", idsParam} },
+            false);
+
+        if (!resp.contains("songs") || !resp["songs"].is_array()) {
+            OutputDebugStringA("[GetSongsDetail] missing songs array\n");
+            continue;
+        }
+
+        for (const auto& item : resp["songs"]) {
+            NeteaseSongInfo s;
+            s.id = SafeGetString(item, "id");
+            s.name = SafeGetString(item, "name", "未知歌曲");
+
+            // ★ 兼容时长 (官方是 duration，第三方是 dt)
+            if (item.contains("duration")) {
+                s.duration = item.value("duration", 0);
             }
+            else if (item.contains("dt")) {
+                s.duration = item.value("dt", 0);
+            }
+
+            s.fee = item.value("fee", 0);
+
+            // ★ 兼容歌手 (官方是 artists，第三方是 ar)
+            std::string artistsKey = item.contains("artists") ? "artists" : "ar";
+            if (item.contains(artistsKey) && item[artistsKey].is_array()) {
+                for (const auto& ar : item[artistsKey]) {
+                    std::string name = SafeGetString(ar, "name");
+                    if (!name.empty()) s.artists.push_back(name);
+                }
+            }
+
+            // ★ 兼容专辑 (官方是 album，第三方是 al)
+            std::string albumKey = item.contains("album") ? "album" : "al";
+            if (item.contains(albumKey) && item[albumKey].is_object()) {
+                s.album = SafeGetString(item[albumKey], "name", "未知专辑");
+                s.albumArtUrl = SafeGetString(item[albumKey], "picUrl");
+            }
+
+            songs.push_back(s);
         }
-        if (item.contains("al") && item["al"].is_object()) {
-            s.album = SafeGetString(item["al"], "name", "未知专辑");
-            s.albumArtUrl = SafeGetString(item["al"], "picUrl");
+
+        if (offset + batchSize < ids.size()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
-        songs.push_back(s);
     }
     return songs;
 }
 
+
 // ========== 获取单首歌曲 URL ==========
-std::string NeteaseAPIManager::GetSongUrl(const std::string& songId, const std::string& level,const std::string cookie) {
-    {
-        auto resp = Request("/song/url/v1", { {"id", songId}, {"level", level} });
-        if (resp.contains("code") && resp["code"].get<int>() != 200) return "";
+std::string NeteaseAPIManager::GetSongUrl(const std::string& songId, const std::string& level, const std::string& cookie) {
+    try {
+        auto resp = Request("/api/song/url/v1", "/song/url/v1",
+            { {"id", songId}, {"level", level} },
+            ApiSource::ThirdParty, true);
+
         if (resp.contains("data") && resp["data"].is_array() && !resp["data"].empty()) {
             const auto& first = resp["data"][0];
-            if (first.contains("url") && !first["url"].is_null() && first["url"].is_string())
+            if (first.contains("url") && !first["url"].is_null() && first["url"].is_string()) {
                 return first["url"].get<std::string>();
+            }
         }
-        
-        return "";
     }
-    //else {
-    //    //auto cookie_with_platform = "MUSIC_U=" + cookie + ";os=pc;";
-    //    auto resp = Request("/song/url/v1", { {"id", songId}, {"level", level} ,{"cookie",cookie_with_platform} });
-    //    if (resp.contains("code") && resp["code"].get<int>() != 200) return "";
-    //    if (resp.contains("data") && resp["data"].is_array() && !resp["data"].empty()) {
-    //        const auto& first = resp["data"][0];
-    //        if (first.contains("url") && !first["url"].is_null() && first["url"].is_string())
-    //            return first["url"].get<std::string>();
-    //    }
-    //    return "";
-    //}
-    
+    catch (const std::exception& e) {
+        OutputDebugStringA(("[GetSongUrl] 异常: " + std::string(e.what()) + "\n").c_str());
+    }
+    return "";
 }
 
 // ========== 获取歌曲完整信息（含 URL） ==========
@@ -225,8 +484,10 @@ NeteaseSongInfo NeteaseAPIManager::GetSongFullInfo(const std::string& songId, co
 
 // ========== 搜索歌曲 ==========
 std::vector<NeteaseSongInfo> NeteaseAPIManager::SearchSongs(const std::string& keyword, int limit) {
-    auto resp = Request("/search", { {"keywords", keyword}, {"limit", std::to_string(limit)} });
-    if (resp.contains("code") && resp["code"].get<int>() != 200)
+    auto resp = Request("/api/cloudsearch/pc", "/search",
+        { {"s", keyword}, {"type","1"},
+          {"limit", std::to_string(limit)}, {"offset","0"} },
+        ApiSource::Official, false);    if (resp.contains("code") && resp["code"].get<int>() != 200)
         throw std::runtime_error("API error: " + std::to_string(resp["code"].get<int>()));
     if (!resp.contains("result") || !resp["result"].contains("songs"))
         return {};
@@ -235,32 +496,60 @@ std::vector<NeteaseSongInfo> NeteaseAPIManager::SearchSongs(const std::string& k
         NeteaseSongInfo s;
         s.id = SafeGetString(item, "id");
         s.name = SafeGetString(item, "name", "未知歌曲");
-        s.duration = item.value("duration", 0);
+
+        // 兼容时长
+        if (item.contains("duration")) {
+            s.duration = item.value("duration", 0);
+        }
+        else if (item.contains("dt")) {
+            s.duration = item.value("dt", 0);
+        }
+
         s.fee = item.value("fee", 0);
-        if (item.contains("artists") && item["artists"].is_array()) {
-            for (const auto& ar : item["artists"]) {
+
+        // 兼容歌手
+        std::string artistsKey = item.contains("artists") ? "artists" : "ar";
+        if (item.contains(artistsKey) && item[artistsKey].is_array()) {
+            for (const auto& ar : item[artistsKey]) {
                 std::string name = SafeGetString(ar, "name");
                 if (!name.empty()) s.artists.push_back(name);
             }
         }
-        if (item.contains("album") && item["album"].is_object()) {
-            s.album = SafeGetString(item["album"], "name", "未知专辑");
+
+        // 兼容专辑
+        std::string albumKey = item.contains("album") ? "album" : "al";
+        if (item.contains(albumKey) && item[albumKey].is_object()) {
+            s.album = SafeGetString(item[albumKey], "name", "未知专辑");
+            s.albumArtUrl = SafeGetString(item[albumKey], "picUrl");
         }
+
         songs.push_back(s);
     }
     return songs;
 }
 
 std::string NeteaseAPIManager::GetLyrics(const std::string& songId) {
-    auto resp = Request("/lyric", { {"id", songId} }, {});
-    if (resp.contains("code") && resp["code"].get<int>() == 200) {
-        if (resp.contains("lrc") && resp["lrc"].is_object()) {
-            auto& lrc = resp["lrc"];
-            if (lrc.contains("lyric") && lrc["lyric"].is_string()) {
-                return lrc["lyric"].get<std::string>();
-            }
-        }
+    // ★ 官方优先（匿名可拿）
+    auto resp = RequestWithRoute(
+        ApiSource::Official,            // ★ 官方优先
+        "/api/song/lyric",
+        "/lyric",
+        {
+            {"os", "pc"},
+            {"id", songId},
+            {"lv", "-1"},
+            {"kv", "-1"},
+            {"tv", "-1"}
+        },
+        false);
+
+    // 官方返回：lrc.lyric（原文）
+    if (resp.contains("lrc") && resp["lrc"].is_object()
+        && resp["lrc"].contains("lyric") && resp["lrc"]["lyric"].is_string()) {
+        std::string lyric = resp["lrc"]["lyric"].get<std::string>();
+        if (!lyric.empty()) return lyric;
     }
+
     return "";
 }
 
@@ -308,7 +597,7 @@ bool NeteaseAPIManager::UpdateCookie(const std::string& cookie) {
     // 4. 调用刷新接口（锁外，因为Request内部会加锁）
     json resp;
     try {
-        resp = Request("/login/refresh", {}, {});
+        resp = RequestThidParty("/login/refresh", {}, {});
     }
     catch (...) {
         return false;
@@ -376,7 +665,7 @@ std::string NeteaseAPIManager::GetCurrentCookie() const {
 
 bool NeteaseAPIManager::SendCaptcha(const std::string& phone) {
     try {
-        auto resp = Request("/captcha/sent", { {"phone", phone} });
+        auto resp = RequestThidParty("/captcha/sent", { {"phone", phone} });
         return resp.contains("code") && resp["code"].get<int>() == 200;
     }
     catch (...) {
@@ -386,13 +675,13 @@ bool NeteaseAPIManager::SendCaptcha(const std::string& phone) {
 
 bool NeteaseAPIManager::LoginByCaptcha(const std::string& phone, const std::string& captcha) {
     try {
-        auto resp = Request("/login/cellphone", { {"phone", phone}, {"captcha", captcha} });
+        auto resp = RequestThidParty("/login/cellphone", { {"phone", phone}, {"captcha", captcha} });
         if (!resp.contains("code") || resp["code"].get<int>() != 200)
             return false;
         // 登录成功后，`Request` 内部已从 Set-Cookie 提取了 cookie 并保存到 m_userCookie
-        // 但由于我们的 Request 函数并未自动保存到 m_userCookie，需要手动处理
-        // 我们可以在 Request 中检测到登录接口时特殊处理，但更简单：在登录成功时主动调用 SetUserCookie
-        // 由于 Request 没有返回 cookie，我们只能通过其他方式获取，但我们也可以直接使用响应中的 cookie 字段
+        // 但由于我们的 RequestThidParty 函数并未自动保存到 m_userCookie，需要手动处理
+        // 我们可以在 RequestThidParty 中检测到登录接口时特殊处理，但更简单：在登录成功时主动调用 SetUserCookie
+        // 由于 RequestThidParty 没有返回 cookie，我们只能通过其他方式获取，但我们也可以直接使用响应中的 cookie 字段
         if (resp.contains("cookie") && resp["cookie"].is_string()) {
             std::string fullCookie = resp["cookie"].get<std::string>();
             // 提取 MUSIC_U 的值
@@ -431,7 +720,7 @@ void NeteaseAPIManager::ClearUserCookie() {
 }
 std::string NeteaseAPIManager::GetNeteaseUserName() {
     try {
-        auto resp = Request("/user/account", {});
+        auto resp = RequestThidParty("/user/account", {});
         if (resp.contains("code") && resp["code"].get<int>() == 200) {
             if (resp.contains("profile") && resp["profile"].contains("nickname")) {
                 return resp["profile"]["nickname"].get<std::string>();

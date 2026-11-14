@@ -78,6 +78,7 @@ license:GPL-3.0 license
 #define WM_APP_SMTC_NEXT   (WM_APP + 3)
 #define WM_APP_SMTC_PREV   (WM_APP + 4)
 #define WM_UPDATE_ALBUM_ART   (WM_APP + 5)
+#define WM_PLAYLIST_UPDATED (WM_APP + 6)
 
 #define WM_FETCH_READY (WM_APP + 10)
 
@@ -98,6 +99,7 @@ struct AsyncFetchResult {
 
 static std::string g_curTitle, g_curArtist, g_curAlbum, g_curLyrics;
 static std::vector<unsigned char> g_curAlbumArt;
+static std::string g_currentPlayingTrackId = "";
 
 static int CurrentIndex = -1;          // 当前播放歌曲在 MusicFiles 中的索引
 static float PlayProgressPercent = 0.0f;// 播放进度（百分比）
@@ -204,10 +206,6 @@ static bool g_skip_vip = false;
 
 static bool g_bRenderSuspended = false;
 
-static bool g_netease_account_login_window_status = false;
-
-std::string g_netease_user_cookie = "";
-
 static bool g_showLoginWindow = false;              // 控制登录窗口显示
 static char g_phoneInput[32] = "";                  // 手机号输入
 static char g_captchaInput[16] = "";                // 验证码输入
@@ -287,7 +285,8 @@ enum StatusCode {
     STATUS_DOWNLOADING = 2,
     STATUS_WRITING_TAGS = 3,
     STATUS_FETCHING_META = 4,
-    STATUS_ERROR = -1
+    STATUS_ERROR = -1,
+    STATUS_FETCHING_INFORMATION = 10
 };
 
 std::string u8string_to_string(const std::u8string& u8str) {
@@ -337,6 +336,7 @@ inline const char* GetStatusText() {
     case STATUS_DOWNLOADING:    return "正在下载歌曲";
     case STATUS_WRITING_TAGS:   return "正在写入标签";
     case STATUS_FETCHING_META:  return "正在获取元数据";
+    case STATUS_FETCHING_INFORMATION: return "正在获取歌曲信息";
     default:                    return "未知";
     }
 }
@@ -1209,35 +1209,87 @@ void PlayMusicFile(int index) {
     g_scrollBlockCounter = 0;
 
     CurrentIndex = index;
+    const BaseTrackInfo* track = g_source->GetBaseTrack(index);
+    if (track) g_currentPlayingTrackId = track->id;
     g_source->SaveIndex(index);
 
+    if (g_source) {
+        int totalCount = (int)g_source->GetCount();
+
+        // 计算安全的起始下标（防负数）
+        int startIdx = index - 19;
+        if (startIdx < 0) startIdx = 0;
+
+        // 计算安全的结束下标（防越界）
+        int endIdx = index + 30;
+        if (endIdx > totalCount) endIdx = totalCount;
+
+        // 触发预加载（底层异步且自带去重，频繁调用也没关系）
+        g_source->RequestTrackDetails(startIdx, endIdx);
+    }
+
     std::thread([index]() {
-        // 1. 获取信息
-        PlaybackInfo info = g_source->PreparePlayback(index);
-        if (!info.isValid) {
+        try {
+            // ★ 核心：优先检查本地缓存
+            std::string finalLocalPath;
+            const BaseTrackInfo* track = g_source ? g_source->GetBaseTrack(index) : nullptr;
+
+            if (track) {
+                PathType cacheW = GetCacheDirectory();
+                PathType pathMp3 = cacheW + Utf8ToPath(track->id + ".mp3");
+                PathType pathFlac = cacheW + Utf8ToPath(track->id + ".flac");
+                std::error_code ec;
+
+                if (std::filesystem::exists(pathFlac, ec) && !ec) {
+                    finalLocalPath = PathToUtf8(pathFlac);
+                }
+                else if (std::filesystem::exists(pathMp3, ec) && !ec) {
+                    finalLocalPath = PathToUtf8(pathMp3);
+                }
+            }
+
+            // 如果命中缓存，直接发消息给主线程播放，立刻 return，不走任何网络！
+            if (!finalLocalPath.empty()) {
+                OutputDebugStringA("[PlayMusicFile] 命中缓存，秒播！\n");
+                AsyncPlayResult result;
+                result.success = true;
+                result.index = index;
+                result.localPath = finalLocalPath;
+                PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
+                return; // 结束线程
+            }
+
+            // ================= 下面是没命中缓存的情况 =================
+            SetStatus(STATUS_FETCHING_INFORMATION);
+            PlaybackInfo info = g_source->PreparePlayback(index);
+
+            if (!info.isValid) {
+                throw std::runtime_error("获取播放信息失败");
+            }
+
+            std::string finalLocalPathNew = DownloadAndProcessTrack(info);
+            if (finalLocalPathNew.empty()) {
+                throw std::runtime_error("下载或处理失败");
+            }
+
+            AsyncPlayResult result;
+            result.success = true;
+            result.index = index;
+            result.localPath = finalLocalPathNew;
+            PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
+        }
+        catch (const std::exception& e) {
             AsyncPlayResult errorRes;
             errorRes.success = false;
-            errorRes.errorMsg = "获取播放信息失败";
+            errorRes.errorMsg = e.what();
             PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(errorRes));
-            return;
         }
-
-        // 2. 统一下载（本地直接返回路径，在线下载+打标签）
-        std::string finalLocalPath = DownloadAndProcessTrack(info);
-        if (finalLocalPath.empty()) {
+        catch (...) {
             AsyncPlayResult errorRes;
             errorRes.success = false;
-            errorRes.errorMsg = "下载或处理失败";
+            errorRes.errorMsg = "未知异常";
             PostMessage(g_hWnd, WM_PLAY_FAILED, 0, (LPARAM)new AsyncPlayResult(errorRes));
-            return;
         }
-
-        // 3. 通知主线程发起播放
-        AsyncPlayResult result;
-        result.success = true;
-        result.index = index;
-        result.localPath = finalLocalPath;
-        PostMessage(g_hWnd, WM_PLAY_READY, 0, (LPARAM)new AsyncPlayResult(result));
         }).detach();
 }
 
@@ -1596,6 +1648,31 @@ void OnPlayFailed(AsyncPlayResult* result) {
     OutputDebugStringA(("准备失败: " + result->errorMsg + "\n").c_str());
     g_loading_music = false;
     delete result;
+
+    // ★ 自动切歌与防死循环
+    static int consecutiveFails = 0;
+    static uint64_t lastFailTime = 0;
+
+    uint64_t now = GetTickCount64();
+    // 如果距离上一次失败超过 5 秒，说明用户隔了很久才点，重置计数器
+    if (now - lastFailTime > 5000) {
+        consecutiveFails = 0;
+    }
+    lastFailTime = now;
+
+    if (consecutiveFails < 10) {
+        consecutiveFails++;
+        OutputDebugStringA(("[OnPlayFailed] 连续失败 " + std::to_string(consecutiveFails) + " 次，尝试自动切换下一首\n").c_str());
+        // 延时切歌，防止请求太快导致服务器风控，也避免 UI 瞬间乱跳
+        std::thread([]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            PostMessage(g_hWnd, WM_APP_SMTC_NEXT, 0, 0); // 或者直接调 AutoPlayNextSong()
+            }).detach();
+    }
+    else {
+        consecutiveFails = 0;
+        ShowMessageBox("播放停止", "连续多首歌曲无法播放已停止自动跳过。");
+    }
 }
 void OnMediaNext() {
     if (!g_source || g_source->GetCount() == 0) return;
@@ -1745,6 +1822,16 @@ bool HandleAppMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
 
     case WM_APP_SMTC_PREV:
         OnMediaPrev();
+        return true;
+
+    case WM_PLAYLIST_UPDATED:
+        if (g_source && !g_currentPlayingTrackId.empty()) {
+            // 当歌单发生变动（增删），使用 ID 找回它最新的位置
+            int newIdx = g_source->FindTrackIndex(g_currentPlayingTrackId);
+            if (newIdx >= 0 && newIdx != CurrentIndex) {
+                CurrentIndex = newIdx;
+            }
+        }
         return true;
 
 
@@ -2030,54 +2117,6 @@ void ReadConfig() {
     g_activeThemeZip = cfg.GetValue<std::string>("active_theme_zip", "");
 }
 
-void InitUserCookie() {
-    //初始化用户cookie
-
-    //调试区域：从明文文件载入cookie
-
-    //std::ifstream infile("D:/cookie.txt");
-    //if (infile.is_open()) {
-    //    // 处理 cookie 文件
-    //    std::getline(infile, g_netease_user_cookie);
-    //    infile.close();
-    //}
-    std::string base64_encryptedCookie = cfg.GetValue<std::string>("encrypted_cookie", "");
-    if (base64_encryptedCookie.empty()) {
-        NeteaseAPIManager::GetInstance().LoginAsGuest();
-    }
-    std::string encryptedCookie2;
-    if (!base64_encryptedCookie.empty()) {
-        encryptedCookie2 = Base64Decode(base64_encryptedCookie);
-    }
-    g_netease_user_cookie.clear();
-
-    if (!encryptedCookie2.empty()) {
-        DecryptString(encryptedCookie2, g_netease_user_cookie);
-    }
-    NeteaseAPIManager::GetInstance().SetUserCookie(g_netease_user_cookie);
-    long long last_update_cookie = 0;
-    std::time_t now = std::time(nullptr);
-    last_update_cookie = cfg.GetValue("last_update_cookie", last_update_cookie);
-    if (now - last_update_cookie > 24 * 60 * 60) {
-        // 如果超过1天没有更新cookie，尝试刷新
-        if (!g_netease_user_cookie.empty()) {
-            if (NeteaseAPIManager::GetInstance().UpdateCookie(g_netease_user_cookie)) {
-                cfg.SetValue("last_update_cookie", now);
-                cfg.Save();
-                g_netease_user_cookie = NeteaseAPIManager::GetInstance().GetCurrentCookie();
-                std::string encryptedCookie;
-                if (EncryptString(g_netease_user_cookie, encryptedCookie)) {
-                    std::string base64_encryptedCookie = Base64Encode(encryptedCookie);
-                    cfg.SetValue("encrypted_cookie", base64_encryptedCookie);
-                    cfg.Save();
-                }
-            }
-            else {
-                OutputDebugStringA("更新cookie失败，可能需要重新登录\n");
-            }
-        }
-    }
-}
 
 static void RegisterAsyncHooks() {
     auto& em = AsyncEventManager::GetInstance();
@@ -2350,6 +2389,27 @@ void RenderFrame(int counter,SettingWindow& settings) {
         if (ImGui::BeginListBox("##MusicList", listbox_size)) {
             bool scrolled = false;
             size_t trackCount = g_source->GetCount();
+
+            // ★ ====================== 懒加载触发机制 ======================
+            if (trackCount > 0 && g_source) {
+                // 1. 计算当前视口对应的行区间
+                float itemHeight = ImGui::GetTextLineHeightWithSpacing(); // 单行高度
+                float scrollY = ImGui::GetScrollY();                      // 当前滚动条位置
+                float winHeight = ImGui::GetWindowHeight();               // 列表窗口可见高度
+
+                int startIndex = (int)(scrollY / itemHeight);
+                int endIndex = (int)((scrollY + winHeight) / itemHeight) + 1;
+
+                // 2. 上下各多预加载 10 首作为缓冲，防止滚动过快出现空白
+                int preloadStart = (std::max)(0, startIndex - 19);
+                int preloadEnd = (std::min)((int)trackCount, endIndex + 30);
+
+                // 3. 通知数据源（如 NeteaseSource）去后台拉取该区间的详情
+                // 注：内部已有并发控制和去重，这里每帧调用也不会重复发请求
+                g_source->RequestTrackDetails(preloadStart, preloadEnd);
+            }
+            // ==============================================================
+
             for (int i = 0; i < trackCount; ++i) {
                 int t_scrollToSong = -1;
                 const BaseTrackInfo* track = g_source->GetBaseTrack(i);
@@ -2565,16 +2625,6 @@ void RenderFrame(int counter,SettingWindow& settings) {
                 ImGui::EndMenu();
             }
 
-            if (g_netease_user_cookie.empty()) {
-                if (ImGui::MenuItem("登录网易云音乐账号", NULL)) {
-                    g_netease_account_login_window_status = !g_netease_account_login_window_status;
-                }
-            }
-            else {
-                if (ImGui::MenuItem("已登录网易云账号", NULL)) {
-                    g_netease_account_window_status = !g_netease_account_window_status;
-                }
-            }
 
             if (ImGui::MenuItem("设置", NULL)) {
                 settings.setOpen(true);
@@ -2586,117 +2636,7 @@ void RenderFrame(int counter,SettingWindow& settings) {
         settings.render();
         PlaybackServiceRegistry::GetInstance().RenderAllWindows();
 
-        if (g_netease_account_login_window_status) {
-            ImGui::SetNextWindowSize(ImVec2(400, 260), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("网易云登录", &g_netease_account_login_window_status, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-                // ---- 手机号行 ----
-                ImGui::Text("手机号");
-                ImGui::SameLine();
-                ImGui::InputText("##PhoneInput", g_phoneInput, sizeof(g_phoneInput));
-                ImGui::SameLine();
-
-                // ---- 获取验证码按钮（带冷却） ----
-                auto now = std::chrono::steady_clock::now();
-                auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - g_lastCaptchaTime).count();
-                bool canSend = (elapsed >= CAPTCHA_COOLDOWN) && !g_captchaSending.load();
-
-                // 动态按钮文本
-                std::string btnLabel;
-                if (g_captchaSending.load()) {
-                    btnLabel = "发送中...";
-                }
-                else if (canSend) {
-                    btnLabel = "获取验证码";
-                }
-                else {
-                    int remain = CAPTCHA_COOLDOWN - (int)elapsed;
-                    btnLabel = "等待 " + std::to_string(remain) + "s";
-                }
-
-                if (ImGui::Button(btnLabel.c_str())) {
-                    if (canSend) {
-                        std::string phone = g_phoneInput;
-                        if (phone.size() != 11) {
-                            g_loginStatusMsg = "请输入有效的11位手机号";
-                        }
-                        else {
-                            // 记录发送时刻并标记发送中
-                            g_lastCaptchaTime = std::chrono::steady_clock::now();
-                            g_captchaSending = true;
-                            g_loginStatusMsg = "正在发送验证码...";
-
-                            std::async(std::launch::async, [phone]() {
-                                bool ok = NeteaseAPIManager::GetInstance().SendCaptcha(phone);
-                                // 发送完成，解除发送中状态（冷却时间由时间控制）
-                                g_captchaSending = false;
-                                g_loginStatusMsg = ok ? "验证码已发送" : "发送失败，请重试";
-                                });
-                        }
-                    }
-                }
-
-                // ---- 验证码输入行 ----
-                ImGui::Text("验证码");
-                ImGui::SameLine();
-                ImGui::InputText("##CaptchaInput", g_captchaInput, sizeof(g_captchaInput));
-                ImGui::SameLine();
-
-                // ---- 登录按钮 ----
-                if (ImGui::Button("登录")) {
-                    std::string phone = g_phoneInput;
-                    std::string captcha = g_captchaInput;
-                    if (phone.empty() || captcha.empty()) {
-                        g_loginStatusMsg = "请填写完整信息";
-                    }
-                    else {
-                        g_loginStatusMsg = "正在登录...";
-                        std::async(std::launch::async, [phone, captcha]() {
-                            bool ok = NeteaseAPIManager::GetInstance().LoginByCaptcha(phone, captcha);
-                            if (ok) {
-                                // 保存加密 Cookie
-                                std::string cookie = NeteaseAPIManager::GetInstance().GetCurrentCookie();
-                                if (!cookie.empty()) {
-                                    std::string encrypted;
-                                    if (EncryptString(cookie, encrypted)) {
-                                        cfg.SetValue("encrypted_cookie", Base64Encode(encrypted));
-                                        cfg.Save();
-                                    }
-                                }
-                                g_loginStatusMsg = "登录成功";
-                                // 可关闭窗口并刷新歌单（您已有逻辑）
-                                // g_netease_account_login_window_status = false;
-                                // PostMessage(g_hWnd, WM_USER_RELOAD_PLAYLIST, 0, 0);
-                            }
-                            else {
-                                g_loginStatusMsg = "登录失败，请检查验证码或网络连接";
-                            }
-                            });
-                    }
-                }
-
-                // ---- 状态信息（自动左对齐） ----
-                ImGui::Text("状态: %s", g_loginStatusMsg.c_str());
-                ImGui::End();
-            }
-        }
-
-        if (g_netease_account_window_status) {
-            ImGui::SetNextWindowSize(ImVec2(400, 260), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("网易云音乐账号详情", &g_netease_account_window_status, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
-                auto netease_username = NeteaseAPIManager::GetInstance().GetNeteaseUserName();
-                ImGui::Text(netease_username.c_str());
-                ImGui::Separator();
-                ImGui::Text("操作");
-                if (ImGui::Button("退出登录")) {
-                    if (ShowConfirmBox("提示", "确定要退出登录吗？")) {
-                        g_netease_user_cookie.clear();
-                        cfg.SetValue("encrypted_cookie", "");
-                        cfg.Save();
-                    }
-                }
-                ImGui::End();
-            }
-        }
+        
         ImVec2 progressbar_size(-FLT_MIN, -FLT_MIN);
         ImGui::ProgressBar(PlayProgressPercent, ImVec2(-FLT_MIN, progress_height), "");
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
@@ -3006,6 +2946,10 @@ void RenderFrame(int counter,SettingWindow& settings) {
         }
     }
 
+    if (g_source && g_source->HasWindow()) {
+        g_source->RenderWindow();
+    }
+
     // 渲染 D3D11
     ImGui::Render();
 }
@@ -3055,10 +2999,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         OutputDebugString(L"Failed to set AppUserModelID\n");
     }
     initMusicList();//音乐源在这里初始化
+
+    if (g_source) {
+        g_source->SyncPlaylistAsync();
+    }
     if (!InitPlaybackBackend()) return 1;  
     try { winrt::init_apartment(); }//winrt初始化
     catch (...) { OutputDebugStringA("winrt没有初始化\n"); }
-    InitUserCookie();
     static SettingWindow settings;
     if (!InitWindow(CLASS_NAME)) return 1;
     InitHotkey(g_hWnd);
@@ -3075,6 +3022,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     InitTaskbarProgress(g_hWnd);
     IconManager::GetInstance().Initialize();
     IconManager::GetInstance().SetThemeColor(g_iconColor);
+
+    
 
     RECT rc;
     GetWindowRect(g_hWnd, &rc);

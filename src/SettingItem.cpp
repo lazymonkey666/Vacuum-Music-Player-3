@@ -79,24 +79,37 @@ void SettingWindow::BuildSourceCategories() {
     if (m_sourcesBuilt) return;
     m_sourcesBuilt = true;
 
-    // 插入点：通用 (index 0) 之后
+    // 获取当前配置里的激活源 ID（比如 "online"）
+    std::string activeId = ManageConfig::GetInstance().GetValue<std::string>("play_mode", "local");
     int insertAt = 1;
 
     for (const auto& d : MusicSourceRegistry::GetInstance().GetDescriptors()) {
-        // 临时构造实例 → 调用 AddSettings 取设置项 → 销毁实例
         auto instance = d.creator();
         if (!instance) continue;
 
         std::vector<std::unique_ptr<SettingItemBase>> items;
         instance->AddSettings(items);
+
+        // ★ 核心：这里就是生成按钮的地方
+        if (d.id == activeId && instance->HasWindow()) {
+            std::string btnLabel = "打开 " + std::string(instance->DisplayName()) + " 面板 / 登录";
+            items.push_back(std::make_unique<SettingItemButton>(
+                btnLabel,
+                [this]() {
+                    if (m_activeSource && m_activeSource->HasWindow()) {
+                        m_activeSource->ShowWindow();
+                    }
+                }
+            ));
+        }
+
         instance.reset();
 
         if (items.empty()) continue;
 
-        // 标题自动补全："播放源：" + 源的显示名
         SettingCategory cat("播放源：" + d.displayName);
         for (auto& item : items) {
-            item->load();                       // 双保险（AddSettings 里已从 config 同步）
+            item->load();
             cat.items.push_back(std::move(item));
         }
 
@@ -108,6 +121,10 @@ void SettingWindow::BuildSourceCategories() {
 
 void SettingWindow::render() {
     if (!open_) return;
+    if (m_sourceDirty) {
+        RebuildSourceCategory();
+        m_sourceDirty = false;
+    }
 
     BuildSourceCategories();       // ★ 懒构建（幂等，只跑一次）
 
@@ -166,4 +183,49 @@ void SettingWindow::render() {
         SaveAndRestart();
     }
     ImGui::End();
+}
+
+
+// 动态重建左侧列表分类
+void SettingWindow::RebuildSourceCategory() {
+    // 记住当前选中的分类名
+    std::string curName;
+    if (selectedCategory_ >= 0 && selectedCategory_ < (int)categories_.size())
+        curName = categories_[selectedCategory_].name;
+
+    // 移除旧的源分类
+    if (m_sourceCategoryIndex >= 0 && m_sourceCategoryIndex < (int)categories_.size()) {
+        categories_.erase(categories_.begin() + m_sourceCategoryIndex);
+        m_sourceCategoryIndex = -1;
+    }
+
+    // 构建新的源分类
+    if (m_source) {
+        SettingCategory sc("当前播放源");
+
+        // 1. 收集音源自己的纯配置项
+        m_source->AddSettings(sc.items);
+
+        // 2. 动态追加安全按钮
+        if (m_source->HasWindow()) {
+            sc.items.push_back(std::make_unique<SettingItemButton>(
+                "打开 " + std::string(m_source->DisplayName()) + " 面板 / 登录",
+                [this]() {
+                    if (m_source && m_source->HasWindow()) {
+                        m_source->ShowWindow();
+                    }
+                }
+            ));
+        }
+
+        if (!sc.items.empty()) {
+            categories_.insert(categories_.begin() + 1, std::move(sc));
+            m_sourceCategoryIndex = 1;
+        }
+    }
+
+    // 恢复选中状态
+    for (int i = 0; i < (int)categories_.size(); ++i) {
+        if (categories_[i].name == curName) { selectedCategory_ = i; break; }
+    }
 }

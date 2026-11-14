@@ -49,6 +49,14 @@ public:
     virtual void AddSettings(std::vector<std::unique_ptr<SettingItemBase>>& items) {}
     virtual int GetLastIndex() const = 0;
     virtual void SaveIndex(int index) = 0;
+    virtual void RequestTrackDetails(size_t startIndex, size_t endIndex) {}
+    virtual void SyncPlaylistAsync() {}
+    virtual int FindTrackIndex(const std::string& id) const { return -1; }
+    virtual int AddTrack(const std::string& id) { return -1; }
+    virtual bool HasWindow() const { return false; }
+    virtual void ShowWindow() {}
+    virtual void RenderWindow() {}
+    virtual const char* DisplayName() const { return "当前音源"; }
 };
 
 // ==========================================

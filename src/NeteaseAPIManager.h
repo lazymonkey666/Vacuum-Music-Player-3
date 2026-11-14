@@ -8,6 +8,8 @@
 #include <nlohmann/json.hpp>
 #include <platform/platform.h>
 
+using json = nlohmann::json;
+
 struct NeteaseSongInfo {
     std::string id;
     std::string name;
@@ -19,6 +21,59 @@ struct NeteaseSongInfo {
     std::string trialUrl;  // 试听链接（30秒）
     std::string albumArtUrl;
     std::string fileType; //音频扩展名
+};
+
+enum class ApiSource { Official, ThirdParty };
+
+struct CircuitBreaker {
+    int  consecutiveFails = 0;
+    int  failThreshold = 3;         // 连续失败 3 次触发
+    int  cooldownSeconds = 60;        // 冷却 60 秒
+    std::chrono::steady_clock::time_point cooldownUntil;
+    std::mutex mtx;
+
+    bool IsInCooldown() {
+        std::lock_guard<std::mutex> lock(mtx);
+        return std::chrono::steady_clock::now() < cooldownUntil;
+    }
+    void OnSuccess() {
+        std::lock_guard<std::mutex> lock(mtx);
+        consecutiveFails = 0;
+    }
+    void OnFailure() {
+        std::lock_guard<std::mutex> lock(mtx);
+        consecutiveFails++;
+        if (consecutiveFails >= failThreshold) {
+            cooldownUntil = std::chrono::steady_clock::now()
+                + std::chrono::seconds(cooldownSeconds);
+            consecutiveFails = 0;   // 冷却后重新计数
+        }
+    }
+    void Reset() {
+        std::lock_guard<std::mutex> lock(mtx);
+        consecutiveFails = 0;
+        cooldownUntil = std::chrono::steady_clock::time_point{};
+    }
+};
+
+struct RateLimiter {
+    int  limitPerMinute = 60;
+    int  count = 0;
+    std::chrono::steady_clock::time_point windowStart;
+    std::mutex mtx;
+
+    bool TryAcquire() {
+        std::lock_guard<std::mutex> lock(mtx);
+        auto now = std::chrono::steady_clock::now();
+        if (windowStart.time_since_epoch().count() == 0
+            || now - windowStart > std::chrono::minutes(1)) {
+            windowStart = now;
+            count = 0;
+        }
+        if (count >= limitPerMinute) return false;
+        count++;
+        return true;
+    }
 };
 
 class NeteaseAPIManager {
@@ -38,7 +93,7 @@ public:
     std::vector<NeteaseSongInfo> GetSongsDetail(const std::vector<std::string>& ids);
 
     // 获取单首歌曲播放 URL（可指定音质：standard, higher, exhigh, lossless, hires）
-    std::string GetSongUrl(const std::string& songId, const std::string& level = "exhigh",const std::string cookie="");
+    std::string GetSongUrl(const std::string& songId, const std::string& level = "exhigh",const std::string& cookie="");
 
     // 获取歌曲完整信息（包括 URL 和 fee）
     NeteaseSongInfo GetSongFullInfo(const std::string& songId, const std::string& level = "exhigh");
@@ -71,8 +126,18 @@ private:
     ~NeteaseAPIManager() = default;
 
     // 通用请求函数（支持额外 headers）
-    nlohmann::json Request(const std::string& path,
-        const std::vector<std::pair<std::string, std::string>>& params = {},
+    json Request(const std::string& officialPath,
+        const std::string& thirdPartyPath,
+        const std::vector<std::pair<std::string, std::string>>& params,
+        ApiSource primary = ApiSource::Official,   // 主源
+        bool needUserCookie = false);              // 仅 ThirdParty 时生效
+    json DoRequest(ApiSource source,
+        const std::string& path,
+        const std::vector<std::pair<std::string, std::string>>& params,
+        bool needUserCookie);
+
+    json RequestThidParty(const std::string& path,
+        const std::vector<std::pair<std::string, std::string>>& params,
         const httplib::Headers& extraHeaders = {});
 
     std::string m_userCookie;
@@ -85,6 +150,20 @@ private:
     std::string SafeGetString(const nlohmann::json& obj, const std::string& key, const std::string& defaultVal = "");
     std::vector<std::string> ExtractTrackIds(const nlohmann::json& trackIdsJson);
     mutable std::mutex m_mutex;   // 保护内部 Cookie 状态
+
+    CircuitBreaker m_officialCircuit;
+    CircuitBreaker m_thirdPartyCircuit;
+    RateLimiter    m_officialLimiter;
+    RateLimiter    m_thirdPartyLimiter;
+
+    // ========== 新增：统一请求入口 ==========
+    // 两个路径分别对应官方和第三方；auto 决定主备顺序
+    json RequestWithRoute(
+        ApiSource primary,
+        const std::string& officialPath,
+        const std::string& thirdPartyPath,
+        const std::vector<std::pair<std::string, std::string>>& params,
+        bool needUserCookie = false);   // 是否需要用户 Cookie
     
 
 };
