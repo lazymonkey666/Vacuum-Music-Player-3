@@ -128,7 +128,7 @@ namespace NSROOT
     static bool IsItemFromService(const DigitalItemPtr& item);
 
     /**
-     * RequestThidParty logo for a given music service and placement
+     * Request logo for a given music service and placement
      * @param service The music service
      * @param placement small|medium|large|x-large|square:x-small|square:small|square|square:x-large
      * @return uri string for the requested logo
