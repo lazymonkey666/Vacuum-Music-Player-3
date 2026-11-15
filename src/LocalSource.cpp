@@ -16,7 +16,7 @@
 #include <taglib/tag.h>
 
 extern std::string PickFolderDialog(WindowHandle hwndOwner);
-extern std::string u8string_to_string(const std::u8string& u8str);
+extern std::string U8StringToString(const std::u8string& u8str);
 
 static std::string s_musicFolder = "";
 static bool        s_recursiveScan = false;
@@ -91,7 +91,7 @@ class LocalSource : public IMusicSource {
             if (s_recursiveScan) {
                 for (const auto& e : std::filesystem::recursive_directory_iterator(rootPathW, ec)) {
                     if (!e.is_regular_file() || !hasMusicExt(e.path())) continue;
-                    std::string abs = u8string_to_string(e.path().u8string());
+                    std::string abs = U8StringToString(e.path().u8string());
                     std::replace(abs.begin(), abs.end(), '\\', '/');
                     tempFiles.push_back({ std::move(abs), e.last_write_time() });
                 }
@@ -99,7 +99,7 @@ class LocalSource : public IMusicSource {
             else {
                 for (const auto& e : std::filesystem::directory_iterator(rootPathW, ec)) {
                     if (!e.is_regular_file() || !hasMusicExt(e.path())) continue;
-                    std::string abs = u8string_to_string(e.path().u8string());
+                    std::string abs = U8StringToString(e.path().u8string());
                     std::replace(abs.begin(), abs.end(), '\\', '/');
                     tempFiles.push_back({ std::move(abs), e.last_write_time() });
                 }

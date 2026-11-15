@@ -202,11 +202,14 @@
     <ClCompile Include="..\third-party\ixwebsocket\IXWebSocketTransport.cpp" />
     <ClCompile Include="AMLLService.cpp" />
     <ClCompile Include="AsyncEventManager.cpp" />
+    <ClCompile Include="initialize.cpp" />
+    <ClCompile Include="MainUI.cpp" />
     <ClCompile Include="MiniaudioBackend.cpp" />
     <ClCompile Include="PlaybackService.cpp" />
     <ClCompile Include="SmtcService.cpp" />
     <ClCompile Include="SonosBackend.cpp" />
     <ClCompile Include="SonosService.cpp" />
+    <ClInclude Include="AppState.h" />
     <ClCompile Include="TagReader.cpp" />
     <ClCompile Include="AMLLWebSocketV2.cpp" />
     <ClCompile Include="IconManager.cpp" />
@@ -219,6 +222,7 @@
     <ClCompile Include="SettingItem.cpp" />
     <ClCompile Include="SonosController.cpp" />
     <ClCompile Include="ThemePack.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\third-party\httplib.h" />
@@ -278,9 +282,12 @@
     <ClInclude Include="..\third-party\zip_file.hpp" />
     <ClInclude Include="AsyncBackendBase.h" />
     <ClInclude Include="AsyncEventManager.h" />
+    <ClInclude Include="initialize.h" />
+    <ClInclude Include="MainUI.h" />
     <ClInclude Include="PlaybackBackend.h" />
     <ClInclude Include="PlaybackService.h" />
     <ClInclude Include="SonosService.h" />
+    <ClInclude Include="StateVar.h" />
     <ClInclude Include="TagReader.h" />
     <ClInclude Include="AMLLWebSocketV2.h" />
     <ClInclude Include="IconManager.h" />
@@ -292,6 +299,7 @@
     <ClInclude Include="SettingItem.h" />
     <ClInclude Include="SonosController.h" />
     <ClInclude Include="ThemePack.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />

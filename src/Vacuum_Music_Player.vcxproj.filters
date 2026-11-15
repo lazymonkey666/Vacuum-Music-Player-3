@@ -183,6 +183,15 @@
     <ClCompile Include="SonosService.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="utils.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MainUI.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="initialize.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TagReader.h">
@@ -396,6 +405,21 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="SonosService.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MainUI.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="StateVar.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AppState.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="initialize.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

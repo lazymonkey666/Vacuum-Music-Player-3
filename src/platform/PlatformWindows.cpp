@@ -1,4 +1,5 @@
 #include "platform.h"
+#include <MainUI.h>
 
 #if PLATFORM_WINDOWS
 
@@ -879,7 +880,7 @@ void PrepareImGui() {
     if (g_FontNormal) io.FontDefault = g_FontNormal;
 
     ImGuiStyle& style = ImGui::GetStyle();
-    UpdateImGuiStyle();
+    MainUI::UpdateImGuiStyle();
 
     ImGui_ImplWin32_Init(g_hWnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);

@@ -396,7 +396,6 @@ void RestartApplication();
 void SaveAndRestart();
 
 void PrepareImGui();
-void UpdateImGuiStyle();
 
 // 解压 zip 文件到指定目录（静默模式，无弹窗）
 bool ExtractZipFile(const std::string& zipPath, const std::string& destDir);

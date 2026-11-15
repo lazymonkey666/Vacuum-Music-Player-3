@@ -8,12 +8,9 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <mutex>
+#include <utils.h>
 
 #include <imgui/imgui.h>
-extern std::string Base64Encode(const std::string& input);
-extern std::string Base64Decode(const std::string& input);
-extern bool EncryptString(const std::string& plain, std::string& encrypted);
-extern bool DecryptString(const std::string& encrypted, std::string& plain);
 using json = nlohmann::json;
 
 // ═══════════════════════════════════════════════════════════
