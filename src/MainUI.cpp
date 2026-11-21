@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "MainUI.h"
 #include "SettingItem.h"
 #include "MusicSource.h"
@@ -13,6 +14,7 @@
 #include <PlaybackView.h>
 #include <cmath>
 #include <AppState.h>
+#include "WindowAnimator.h"
 
 // 引用 main.cpp 的核心业务函数
 extern void PlayMusicFile(int index);
@@ -21,7 +23,6 @@ extern void OnMediaNext();
 extern bool ChangePlayMode();
 extern bool seek(float seekRatio);
 extern IPlaybackBackend* ActiveBackend();
-extern void StartHideShowAnimation(bool hide);
 extern void AutoPlayNextSong();
 
 namespace MainUI {
@@ -369,7 +370,7 @@ namespace MainUI {
             ImGui::SameLine();
             // 隐藏/显示窗口按钮
             if (ImGui::ImageButton("hide_btn", (ImTextureID)GetIcon("hide"), ImVec2(16, 16))) {
-                StartHideShowAnimation(!g_isWindowHidden);
+                WindowAnimator::Get().Toggle();
             }
             ImGui::SameLine();
 

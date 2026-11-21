@@ -103,37 +103,15 @@ inline ImFont* g_FontLarge = nullptr;
 inline UINT g_uTaskbarBtnMsg = 0;
 inline std::vector<std::string> g_RemainPlaylist;
 
-// ── 8. 窗口动画、拖拽与吸附（主线程专属，不需要多线程保护） ──
-inline bool     g_isAnimating = false;
-inline bool     g_targetHidden = false;
-inline int      g_animStep = 0;
-inline int      g_animTotalSteps = 15;
 inline bool     g_userWheel = false;
 
-// ★ 直接用普通变量，彻底避开模板/原子类的约束
-inline RECT     g_animStartRect = { 0, 0, 0, 0 };
-inline RECT     g_animTargetRect = { 0, 0, 0, 0 };
-inline BYTE     g_animStartAlpha = 255;
-inline BYTE     g_animTargetAlpha = 255;
-inline UINT_PTR g_animTimer = 0;
-inline bool     g_isWindowHidden = false;
-inline int      g_displayX = 0;
-inline int      g_displayY = 0;
-inline int      g_windowSide = 0;
-inline int      g_currentAlpha = 255;
-
-inline int      g_animStartWidth = 0, g_animTargetWidth = 0;
-inline int      g_animStartHeight = 0, g_animTargetHeight = 0;
 inline int      g_normalWidth = 700;
 inline int      g_normalHeight = 230;
 inline int      g_snapThreshold = 10;
 inline int      g_lastSnapSide = -1;
+inline int      g_windowSide = 0;
+
 inline PlaybackStateMachine g_sm;
-
-inline bool     g_isDragging = false;
-inline POINT    g_dragStartPos = { 0, 0 };
-inline POINT    g_windowStartPos = { 0, 0 };
-
 
 inline std::vector<PlaybackDeviceInfo> s_cachedSonosDevices;
 inline StateVar<int> s_selectedSonosDeviceIdx{ -1 };

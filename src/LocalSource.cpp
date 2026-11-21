@@ -1,3 +1,4 @@
+#include "pch.h"
 #define NOMINMAX
 #include "MusicSource.h"
 #include <platform/platform.h>
@@ -58,12 +59,17 @@ class LocalSource : public IMusicSource {
     }
     // ★ 新增：安全版显示名（原 substr 在“歌不在根目录下”时会抛 out_of_range）
     std::string MakeDisplayName(const std::string& f) const {
-        std::string rel = f;
-        if (f.size() >= m_rootPath.size() && f.compare(0, m_rootPath.size(), m_rootPath) == 0)
-            rel = f.substr(m_rootPath.size());
-        if (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
-        std::replace(rel.begin(), rel.end(), '\\', '/');
-        return rel;
+        std::string normalized = NormalizePath(f);
+        if (m_rootPath.empty()) return normalized;
+
+        std::string prefix = m_rootPath;
+        if (!prefix.empty() && prefix.back() != '/') prefix += '/';
+
+        if (normalized.size() >= prefix.size() &&
+            normalized.compare(0, prefix.size(), prefix) == 0) {
+            return normalized.substr(prefix.size());
+        }
+        return normalized;   // 不在 root 下（如外部添加的歌）→ 保留全路径
     }
     // ★ 新增：取修改时间，取不到就排最后（括号是防 windows.h 的 min 宏）
     static std::filesystem::file_time_type GetWriteTime(const std::string& f) {
@@ -188,7 +194,9 @@ public:
             cfg.SetValue("music_folder", s_musicFolder);
             cfg.Save();
         }
-        m_rootPath = s_musicFolder;
+        m_rootPath = NormalizePath(s_musicFolder);
+        while (!m_rootPath.empty() && m_rootPath.back() == '/')
+            m_rootPath.pop_back();          // 去掉尾部斜杠
 
         // ★ 极速小技巧：先检查上次播放的是哪首，如果还在，优先把它塞进列表
         // 这样主程序瞬间就能定位到上次播放的歌，不会卡在 0 索引

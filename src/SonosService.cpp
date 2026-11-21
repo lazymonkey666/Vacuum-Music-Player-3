@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "SonosService.h"
 #include "PlaybackBackend.h"
 #include <ManageConfig.h>

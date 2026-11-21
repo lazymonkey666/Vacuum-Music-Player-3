@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "PlaybackView.h"
 #include "utils.h"
 

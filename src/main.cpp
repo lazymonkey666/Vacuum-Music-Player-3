@@ -19,24 +19,22 @@ license:GPL-3.0 license
 #include <platform/platform.h>
 
 #include "miniaudio.h"
-#include <stdio.h>
-#include <random>
 #include <atomic>
 #include <cstdint>
-#include <unordered_map>
 #include <iostream>
-
-
+#include <random>
+#include <stdio.h>
+#include <unordered_map>
 
 // ImGui 核心
 #include <imgui/imgui.h>
 
 // 项目内部（逻辑层）
-#include <TagReader.h>
-#include <ManageConfig.h>
 #include <AMLLWebSocketV2.h>
-#include <SettingItem.h>
+#include <ManageConfig.h>
 #include <NeteaseAPIManager.h>
+#include <SettingItem.h>
+#include <TagReader.h>
 
 #include <IconManager.h>
 #include <ThemePack.h>
@@ -45,8 +43,8 @@ license:GPL-3.0 license
 #include <MusicSource.h>
 
 //模块化播放后端
-#include <PlaybackBackend.h>
 #include <AsyncBackendBase.h>
+#include <PlaybackBackend.h>
 
 //模块化播放服务
 #include <PlaybackService.h>
@@ -63,8 +61,10 @@ license:GPL-3.0 license
 
 #include <APPState.h>
 #include <initialize.h>
-#include <utils.h>
 #include <MainUI.h>
+#include <utils.h>
+
+#include <WindowAnimator.h>
 
 #define HOTKEY_NEXT      1001
 #define HOTKEY_PREV      1002
@@ -96,95 +96,6 @@ void SaveAndRestart() {
     RestartApplication();   // 平台函数
 }
 
-
-
-void UpdateWindowSide() {
-    RECT rc = GetWindowRectPlat(g_hWnd);
-    int screenWidth = GetScreenWidth();
-    int centerX = rc.left + (rc.right - rc.left) / 2;
-    g_windowSide = (centerX < screenWidth / 2) ? 0 : 1; // 0=左，1=右
-    // 更新显示时的X坐标
-    if (g_windowSide == 0) {
-        g_displayX = 0;
-    }
-    else {
-        g_displayX = screenWidth - (rc.right - rc.left);
-    }
-    g_displayY = rc.top;
-}
-
-void StartHideShowAnimation(bool hide) {
-    if (g_isAnimating) return;
-    RECT currentRect = GetWindowRectPlat(g_hWnd);
-    int screenWidth = GetScreenWidth();
-    int winWidth = currentRect.right - currentRect.left;
-    int winHeight = currentRect.bottom - currentRect.top;
-
-    // 默认目标位置为当前位置
-    RECT targetRect = currentRect;
-    BYTE targetAlpha = 255;
-
-    // 记录当前尺寸
-    g_animStartWidth = winWidth;
-    g_animStartHeight = winHeight;
-
-    if (hide) {
-        targetAlpha = 0;
-        if (g_enableSnapToEdge) {
-            // 贴边停靠：移出屏幕，大小不变
-            if (g_windowSide == 0) {
-                targetRect.left = -winWidth;
-                targetRect.right = 0;
-            }
-            else {
-                targetRect.left = screenWidth;
-                targetRect.right = screenWidth + winWidth;
-            }
-            g_animTargetWidth = winWidth;
-            g_animTargetHeight = winHeight;
-        }
-        else {
-            // 不贴边：位置不变，缩小到 0
-            targetRect = currentRect; // 位置不变
-            g_animTargetWidth = 0;
-            g_animTargetHeight = 0;
-        }
-    }
-    else { // 显示
-        
-
-        targetAlpha = 255;
-        if (g_enableSnapToEdge) {
-            // 贴边停靠：移回显示位置，大小不变
-            targetRect.left = g_displayX;
-            targetRect.right = g_displayX + winWidth;
-            targetRect.top = g_displayY;
-            targetRect.bottom = g_displayY + winHeight;
-            g_animTargetWidth = winWidth;
-            g_animTargetHeight = winHeight;
-        }
-        else {
-            ShowWindowPlat(g_hWnd);
-            // 不贴边：位置不变，放大到正常大小
-            targetRect = currentRect;
-            g_animTargetWidth = g_normalWidth;
-            g_animTargetHeight = g_normalHeight;
-        }
-    }
-
-    // 记录起始状态（位置和透明度）
-    g_animStartRect = currentRect;
-    g_animTargetRect = targetRect;
-    g_animStartAlpha = g_currentAlpha;
-    g_animTargetAlpha = targetAlpha;
-    g_animStep = 0;
-    g_isAnimating = true;
-    g_targetHidden = hide;
-
-    if (g_animTimer) StopWindowTimer(g_hWnd, g_animTimer);
-    g_animTimer = StartWindowTimer(g_hWnd, 10);
-}
-
 std::vector<std::wstring> wsplit(const std::wstring& word, const std::wstring& s) {
     if (s.empty()) {
         throw std::invalid_argument("split(): empty separator");
@@ -206,64 +117,38 @@ std::vector<std::wstring> wsplit(const std::wstring& word, const std::wstring& s
     return result;
 }
 
-
-
-
-
-//std::wstring s2ws(const std::string& str) {//万年老函数，老资历 ！
-//    return Utf8ToPath(str);
-//}
-
-
 void PlayMusicFile(int index) {
     if (!g_source || index < 0 || index >= (int)g_source->GetCount()) return;
 
-    // ① UI 副作用（状态机不管）
+    // 1. UI 副作用（状态机不管）
     SetStatus(STATUS_FETCHING_URL);
     MainUI::g_scrollBlockCounter = 0;
 
-    // ② 预读标签（滚动条附近的 50 首）
+    // 2. 预读标签（滚动条附近的 50 首）
     int totalCount = (int)g_source->GetCount();
     int startIdx = (index - 19 < 0) ? 0 : index - 19;
     int endIdx = (index + 30 > totalCount) ? totalCount : index + 30;
     g_source->RequestTrackDetails(startIdx, endIdx);
 
-    // ③ 保存索引
+    // 3. 保存索引
     g_source->SaveIndex(index);
 
-    // ④ 交给状态机（后面全自动）
+    // 4. 交给状态机（后面全自动）
     const BaseTrackInfo* track = g_source->GetBaseTrack(index);
     g_sm.Play(index, track ? track->id : "");
 }
 
 void UpdateCurrentPlaying(int new_index) {
     if (!g_source || g_source->GetCount() == 0) return;
-
     if (new_index < 0 || new_index >= (int)g_source->GetCount())
+    {
         CurrentIndex = 0;
-    else
-        CurrentIndex = new_index;
-
-    PlayMusicFile(CurrentIndex);
-    // ❌ 删掉：IsPlaying = true;   // 现在由状态机管
-}
-
-void StopAnimation() {
-    if (g_isAnimating) {
-        if (g_animTimer) StopWindowTimer(g_hWnd, g_animTimer);
-        g_animTimer = 0;
-        g_isAnimating = false;
-
-        // 强制恢复到正常显示状态（大小正常，透明度255）
-        RECT rc = GetWindowRectPlat(g_hWnd);
-        int w = g_normalWidth  > 0 ? g_normalWidth  : 700;
-        int h = g_normalHeight > 0 ? g_normalHeight : 230;
-        MoveResizeWindowPlat(g_hWnd, rc.left, rc.top, w, h);
-        SetWindowAlpha(g_hWnd, 255);
-        g_currentAlpha = 255;
-        g_isWindowHidden = false;
-        UpdateWindowSide();
     }
+    else
+    {
+        CurrentIndex = new_index;
+    }
+    PlayMusicFile(CurrentIndex);
 }
 
 void initMusicList() {
@@ -281,64 +166,13 @@ void initMusicList() {
         RequestQuitProgram();
         return;
     }
-
     CurrentIndex = g_source->GetLastIndex();
     if (g_source->GetCount() == 0) CurrentIndex = -1;
 }
 
-static void SnapToEdgeWithAnimation() {
-    if (g_isAnimating) return;  // 动画进行中，避免冲突
-    if (!g_enableSnapToEdge) return;
-    RECT rc = GetWindowRectPlat(g_hWnd);
-    int winWidth = rc.right - rc.left;
-    int winHeight = rc.bottom - rc.top;
-    int screenWidth = GetScreenWidth();
-    int screenHeight = GetScreenHeight();
-
-    // 计算最近的边缘（左/右）
-    int centerX = rc.left + winWidth / 2;
-    int targetX;
-    int targetSide;
-    if (centerX < screenWidth / 2) {
-        targetX = 0;           // 左边缘
-        targetSide = 0;
-    }
-    else {
-        targetX = screenWidth - winWidth;  // 右边缘
-        targetSide = 1;
-    }
-    // 可选：保持垂直位置不变（或贴顶/底）
-    int targetY = rc.top;  // 不改变垂直位置
-
-    // 如果已经在目标位置，无需动画
-    if (rc.left == targetX && rc.top == targetY) { UpdateWindowSide(); return; }
-
-
-    // 复用动画变量
-    g_animStartRect = rc;
-    g_animTargetRect = { targetX, targetY, targetX + winWidth, targetY + winHeight };
-    g_animStartAlpha = g_currentAlpha;
-    g_animTargetAlpha = g_currentAlpha;  // 透明度不变
-    g_animStep = 0;
-    g_isAnimating = true;
-    g_targetHidden = false;  // 不是隐藏动画
-
-    // 更新显示位置（供隐藏/显示动画使用）
-    g_animStartWidth = winWidth;
-    g_animTargetWidth = winWidth;
-    g_animStartHeight = winHeight;
-    g_animTargetHeight = winHeight;
-
-    g_displayX = targetX;
-    g_displayY = targetY;
-    g_windowSide = targetSide;
-
-    if (g_animTimer) StopWindowTimer(g_hWnd, g_animTimer);
-    g_animTimer = StartWindowTimer(g_hWnd, 10);
-}
-
 int Destroy(HWND hWnd) {
     cfg.Save();
+    WindowAnimator::Get().Stop();
     RECT rc = GetWindowRectPlat(hWnd);
     if (rc.right > rc.left && rc.bottom > rc.top) {
         int lastX = cfg.GetValue<int>("window_x", -1);
@@ -350,7 +184,6 @@ int Destroy(HWND hWnd) {
             cfg.Save();
         }
     }
-
 
     PlaybackServiceRegistry::GetInstance().ShutdownAll();
 
@@ -364,7 +197,7 @@ int Destroy(HWND hWnd) {
         ReleaseTexture(MusicMeta.albumArtSRV);
         MusicMeta.albumArtSRV = nullptr;
     }
-    StopWindowTimer(hWnd, g_animTimer);
+    WindowAnimator::Get().Stop();
     std::filesystem::remove(coverPath);
     CleanupNetwork();
     UnregisterSessionNotification();
@@ -374,7 +207,6 @@ int Destroy(HWND hWnd) {
 }
 
 bool ChangePlayMode() {
-    // ❌ 原来那一大坨 RequestPlay/RequestPause + 乐观 IsPlaying 全删
     g_sm.TogglePlay();
     return g_sm.IsPlaying();
 }
@@ -466,17 +298,9 @@ void OnHotkey(int id) {
     case HOTKEY_NEXT:       OnMediaNext();       break;
     case HOTKEY_PREV:       OnMediaPrev();       break;
     case HOTKEY_PLAYPAUSE:  ChangePlayMode();    break;
-    case HOTKEY_SHOWHIDE:   StartHideShowAnimation(!g_isWindowHidden); break;
+    case HOTKEY_SHOWHIDE:   WindowAnimator::Get().Toggle(); break;
     case HOTKEY_QUIT:       RequestQuit();       break;  // ← 见下方说明
     }
-}
-
-void OnDragEnd() {
-    if (!g_isDragging) return;
-    StopAnimation();
-    g_isDragging = false;
-    ReleaseMouseCapture();             // ← 这个是平台相关，见下方
-    SnapToEdgeWithAnimation();
 }
 
 static void ScheduleAlbumArtUpdate() {
@@ -551,53 +375,6 @@ void OnAlbumArtReady(AlbumArtAsyncResult* result) {
     delete result;
 }
 
-void OnAnimationTick() {
-    g_animStep++;
-    float t = (float)g_animStep / g_animTotalSteps;
-
-    if (t >= 1.0f) {
-        StopWindowTimer(g_hWnd, g_animTimer);
-        g_animTimer = 0;
-        g_isAnimating = false;
-    
-        int finalW = g_animTargetWidth;
-        int finalH = g_animTargetHeight;
-        if (finalW < 1) finalW = 1;      // ★ 加这两行
-        if (finalH < 1) finalH = 1;
-    
-        MoveResizeWindowPlat(g_hWnd,
-            g_animTargetRect.left, g_animTargetRect.top,
-            finalW, finalH);
-
-        SetWindowAlpha(g_hWnd, 255);
-        if (g_targetHidden) {
-            if (!g_enableSnapToEdge){
-                HideWindowPlat(g_hWnd);
-            }
-            OutputDebugStringA("[hide] window hidden\n");
-        }
-        g_currentAlpha = g_animTargetAlpha;
-        g_isWindowHidden = g_targetHidden;
-        UpdateWindowSide();
-        return;
-    }
-
-    float eased = g_targetHidden
-        ? t * t * t
-        : 1.0f - powf(1.0f - t, 3);
-
-    int x = g_animStartRect.left + (int)((g_animTargetRect.left - g_animStartRect.left) * eased);
-    int y = g_animStartRect.top + (int)((g_animTargetRect.top - g_animStartRect.top) * eased);
-    int width = g_animStartWidth + (int)((g_animTargetWidth - g_animStartWidth) * eased);
-    int height = g_animStartHeight + (int)((g_animTargetHeight - g_animStartHeight) * eased);
-    if (width < 1) width = 1;
-    if (height < 1) height = 1;
-
-    BYTE alpha = (BYTE)(g_animStartAlpha + (g_animTargetAlpha - g_animStartAlpha) * eased);
-    MoveResizeWindowPlat(g_hWnd, x, y, width, height);
-    SetWindowAlpha(g_hWnd, alpha);
-    g_currentAlpha = alpha;
-}
 // ═══════════════════════════════════════════════════════════
 // 业务消息分发（跨平台，WndProc 和 LnxProc 都调它）
 // ═══════════════════════════════════════════════════════════
@@ -641,18 +418,12 @@ bool HandleAppMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
             }
         }
         return true;
-
-
     case WM_TIMER:
-        if (wParam == 12345 && g_isAnimating) {
-            OnAnimationTick();
-        }
+        if (wParam == 12345 && WindowAnimator::Get().IsAnimating())
+            WindowAnimator::Get().OnTick();
         return true;
-
-    
     }return false;  // 不是业务消息
 }
-
 
 #if PLATFORM_WINDOWS
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -718,62 +489,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 
     case WM_RBUTTONDOWN: {
-        // 右键拖动：无视任何控件，直接启动
-        g_isDragging = true;
-        GetCursorPos(&g_dragStartPos);
-        RECT rc;
-        GetWindowRect(hWnd, &rc);
-        g_windowStartPos.x = rc.left;
-        g_windowStartPos.y = rc.top;
+        POINT p; GetCursorPos(&p);
+        WindowAnimator::Get().BeginDrag(p);
         CaptureMouse(hWnd);
-        return 0;  // 阻止右键菜单
+        return 0;
     }
 
     case WM_MOUSEMOVE: {
-        if (g_isDragging) {
-            POINT curPos;
-            GetCursorPos(&curPos);
-            int dx = curPos.x - g_dragStartPos.x;
-            int dy = curPos.y - g_dragStartPos.y;
-            int newX = g_windowStartPos.x + dx;
-            int newY = g_windowStartPos.y + dy;
-
-            // 获取屏幕工作区（排除任务栏）
-            RECT workArea;
-            SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
-            int screenLeft = workArea.left;
-            int screenRight = workArea.right;
-            int screenTop = workArea.top;
-            int screenBottom = workArea.bottom;
-            RECT rc;
-            GetWindowRect(hWnd, &rc);
-            int winWidth = rc.right - rc.left;
-            int winHeight = rc.bottom - rc.top;
-
-            // 水平贴边
-            if (g_enableSnapToEdge) {
-                if (newX <= screenLeft + g_snapThreshold) {
-                    newX = screenLeft;
-                }
-                else if (newX + winWidth >= screenRight - g_snapThreshold) {
-                    newX = screenRight - winWidth;
-                }
-                // 垂直贴边（可选）
-                if (newY <= screenTop + g_snapThreshold) {
-                    newY = screenTop;
-                }
-                else if (newY + winHeight >= screenBottom - g_snapThreshold) {
-                    newY = screenBottom - winHeight;
-                }
-            }
-            MoveWindowPlat(hWnd, newX, newY);
-
-            // ===== 添加以下三行 =====
-            UpdateWindowSide();                     // 更新显示位置和停靠侧
-            GetWindowRect(hWnd, &rc);               // 重新获取窗口位置
-            g_windowStartPos.x = rc.left;           // 更新拖动起点
-            g_windowStartPos.y = rc.top;
-            g_dragStartPos = curPos;                // 更新鼠标起点
+        if (WindowAnimator::Get().IsDragging()) {
+            POINT p; GetCursorPos(&p);
+            WindowAnimator::Get().UpdateDrag(p);
             return 0;
         }
         break;
@@ -784,8 +509,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     }
     case WM_RBUTTONUP:
     case WM_LBUTTONUP: {
-        if (g_isDragging) {
-            OnDragEnd();
+        if (WindowAnimator::Get().IsDragging()) {
+            WindowAnimator::Get().EndDrag();
             return 0;
         }
         break;
@@ -822,7 +547,6 @@ static void RegisterAsyncHooks() {
     // ═══════════════════════════════════════════════════════
     // PreLoad：读元数据 / 歌词 / 封面（worker 线程执行）-> 已经在initialize.cpp中注册 此处无代码
     // ═══════════════════════════════════════════════════════
-
 
     // ═══════════════════════════════════════════════════════
     // BackendLoaded：后端加载成功 → 发起播放
@@ -1063,7 +787,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             continue;
         }
 
-        if (g_isWindowHidden && !g_isAnimating) {
+        if (WindowAnimator::Get().IsHidden() && !WindowAnimator::Get().IsAnimating()) {
             // 隐藏且无动画时限制帧率
             static auto lastRender = std::chrono::steady_clock::now();
             auto now = std::chrono::steady_clock::now();

@@ -1,3 +1,4 @@
+#include "pch.h"
 #define NOMINMAX
 #include "platform/platform.h"
 #include "IconManager.h"

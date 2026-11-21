@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "AsyncBackendBase.h"
 #include "SonosService.h"
 #include <ManageConfig.h>

@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "Initialize.h"
 #include "AppState.h"
 #include <PlaybackStateMachine.h>
@@ -16,10 +17,10 @@
 #include "IconManager.h"
 #include "ThemePack.h"
 #include "NeteaseAPIManager.h"
+#include <WindowAnimator.h>
 
 // 外部业务函数声明（后续抽离到 PlaybackController 中）
 extern void AutoPlayNextSong();
-extern void UpdateWindowSide();
 extern void ApplyTheme(const std::string& mode, int opacity);
 
 
@@ -199,9 +200,8 @@ AsyncEventManager::GetInstance().PostToMainThread(
     static bool InitWindowPlatform(const std::string& className) {
         if (!InitWindowPlat(className)) return false;
 
-        UpdateWindowSide();
-        g_currentAlpha = 255;
-        g_isWindowHidden = false;
+        WindowAnimator::Get().Init(g_hWnd);
+        WindowAnimator::Get().Reset();
         MainUI::g_NeedScrollToCurrent = true;
 
         int lastX = cfg.GetValue<int>("window_x", -1);
@@ -216,7 +216,7 @@ AsyncEventManager::GetInstance().PostToMainThread(
             MoveWindowPlat(g_hWnd, lastX, lastY);
         }
 
-        UpdateWindowSide();
+        WindowAnimator::Get().UpdateSide();
         ApplyTheme(g_dark_mode.Get(), g_opacity);
         SetWindowAlpha(g_hWnd, 255);
 

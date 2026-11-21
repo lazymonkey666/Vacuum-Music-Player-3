@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "platform.h"
 #include <MainUI.h>
 

@@ -1,3 +1,4 @@
+#include "pch.h"
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "NeteaseAPIManager.h"
 #define CPPHTTPLIB_USE_WIN32_FILE_IO 0

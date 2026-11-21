@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "SonosController.h"
 
 #include <platform/platform.h>

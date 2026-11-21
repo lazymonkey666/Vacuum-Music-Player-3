@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "SettingItem.h"
 #include "ManageConfig.h"
 #include <string>

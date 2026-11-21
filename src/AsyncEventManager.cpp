@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "AsyncEventManager.h"
 #include <algorithm>   // std::remove_if
 

@@ -1,3 +1,4 @@
+#include "pch.h"
 // TagReader.cpp
 #include "TagReader.h"
 #include <platform/platform.h>

@@ -198,6 +198,15 @@
     <ClCompile Include="PlaybackView.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="WindowAnimator.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="application.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TagReader.h">
@@ -433,6 +442,15 @@
     </ClInclude>
     <ClInclude Include="PlaybackView.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowAnimator.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="application.h">
+      <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,3 +1,4 @@
+#include "pch.h"
 #include <platform/platform.h>
 
 #if PLATFORM_LINUX

@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "LinuxThemeDetector.h"
 #include <iostream>
 #include <cstring>

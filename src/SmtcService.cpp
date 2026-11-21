@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "PlaybackService.h"
 #include "AsyncEventManager.h"
 #include <platform/platform.h>

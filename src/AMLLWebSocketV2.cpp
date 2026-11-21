@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "AMLLWebSocketV2.h"
 #include <platform/platform.h>
 #include <sstream>
