@@ -206,6 +206,8 @@
     <ClCompile Include="MainUI.cpp" />
     <ClCompile Include="MiniaudioBackend.cpp" />
     <ClCompile Include="PlaybackService.cpp" />
+    <ClCompile Include="PlaybackStateMachine.cpp" />
+    <ClCompile Include="PlaybackView.cpp" />
     <ClCompile Include="SmtcService.cpp" />
     <ClCompile Include="SonosBackend.cpp" />
     <ClCompile Include="SonosService.cpp" />
@@ -286,6 +288,8 @@
     <ClInclude Include="MainUI.h" />
     <ClInclude Include="PlaybackBackend.h" />
     <ClInclude Include="PlaybackService.h" />
+    <ClInclude Include="PlaybackStateMachine.h" />
+    <ClInclude Include="PlaybackView.h" />
     <ClInclude Include="SonosService.h" />
     <ClInclude Include="StateVar.h" />
     <ClInclude Include="TagReader.h" />

@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "MusicSource.h"
 #include <platform/platform.h>
 #include <manageconfig.h>
@@ -11,6 +12,7 @@
 #include <atomic>
 #include <string>
 #include <vector>
+#include <AppState.h>
 
 #include <taglib/fileref.h>
 #include <taglib/tag.h>
@@ -30,6 +32,7 @@ static void LoadLocalSettingsFromConfig() {
 struct LocalTrackInfo : public BaseTrackInfo {
     bool isDetailLoaded = false;
     std::string filePath;
+    std::filesystem::file_time_type lastWrite{};   // ★ 新增
 };
 
 class LocalSource : public IMusicSource {
@@ -43,26 +46,45 @@ class LocalSource : public IMusicSource {
 
     // 懒加载专用锁
     std::mutex m_loadingMtx;
-    std::set<size_t> m_loadingIndices;
-
+    std::unordered_set<std::string> m_loadingPaths;   // ★ 改：原 std::set<size_t> m_loadingIndices
+    std::atomic<bool> m_needFixOrder{ false };        // ★ 新增：抢插过，扫完要归位
     std::atomic<bool> m_isScanning{ false };
 
-    // ★ 安全且极速的单条添加函数
-    void AddSingleTrack(const std::string& f) {
-        std::unique_lock lock(m_trackMtx); // 加上写锁
-        if (m_pathSet.count(f)) return;    // 已存在，跳过
-        m_pathSet.insert(f);
+    // ★ 新增：路径归一化（和扫描结果保持一致，否则查重失效会出现两条同一首歌）
+    static std::string NormalizePath(const std::string& p) {
+        std::string s = p;
+        std::replace(s.begin(), s.end(), '\\', '/');
+        return s;
+    }
+    // ★ 新增：安全版显示名（原 substr 在“歌不在根目录下”时会抛 out_of_range）
+    std::string MakeDisplayName(const std::string& f) const {
+        std::string rel = f;
+        if (f.size() >= m_rootPath.size() && f.compare(0, m_rootPath.size(), m_rootPath) == 0)
+            rel = f.substr(m_rootPath.size());
+        if (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
+        std::replace(rel.begin(), rel.end(), '\\', '/');
+        return rel;
+    }
+    // ★ 新增：取修改时间，取不到就排最后（括号是防 windows.h 的 min 宏）
+    static std::filesystem::file_time_type GetWriteTime(const std::string& f) {
+        std::error_code ec;
+        auto t = std::filesystem::last_write_time(Utf8ToPath(f), ec);
+        if (ec) return (std::filesystem::file_time_type::min)();
+        return t;
+    }
 
+    // ★ 安全且极速的单条添加函数
+    void AddSingleTrack(const std::string& rawPath) {
+        const std::string f = NormalizePath(rawPath);   // ★ 新增
+        auto wt = GetWriteTime(f);                      // ★ 新增：IO 放锁外
+        std::unique_lock lock(m_trackMtx);
+        if (!m_pathSet.insert(f).second) return;        // ★ 改：查重+插入一步走
         auto track = std::make_unique<LocalTrackInfo>();
         track->id = f;
         track->filePath = f;
         track->isDetailLoaded = false;
-
-        std::string rel = f.substr(m_rootPath.size());
-        if (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
-        std::replace(rel.begin(), rel.end(), '\\', '/');
-        track->displayName = rel;
-
+        track->lastWrite = wt;                          // ★ 新增
+        track->displayName = MakeDisplayName(f);        // ★ 改
         m_tracks.push_back(std::move(track));
     }
 
@@ -112,34 +134,45 @@ class LocalSource : public IMusicSource {
             [](const FileInfo& a, const FileInfo& b) { return a.last_write > b.last_write; });
 
         // 3. 分批塞入主列表（每 1000 首加一次锁，让 UI 产生“不断添加”的视觉体验）
+                // 3. 分批塞入主列表（每 1000 首加一次锁，让 UI 产生“不断添加”的视觉体验）
         const size_t batchSize = 1000;
+        bool addedAny = false;                                   // ★ 新增
         for (size_t i = 0; i < tempFiles.size(); i += batchSize) {
             {
                 std::unique_lock lock(m_trackMtx); // 加上写锁
                 for (size_t j = i; j < i + batchSize && j < tempFiles.size(); ++j) {
                     const auto& f = tempFiles[j].path;
-                    if (m_pathSet.count(f)) continue; // 查重
-                    m_pathSet.insert(f);
-
+                    if (!m_pathSet.insert(f).second) continue;    // ★ 改：查重
                     auto track = std::make_unique<LocalTrackInfo>();
                     track->id = f;
                     track->filePath = f;
                     track->isDetailLoaded = false;
-
-                    std::string rel = f.substr(m_rootPath.size());
-                    if (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
-                    std::replace(rel.begin(), rel.end(), '\\', '/');
-                    track->displayName = rel;
-
+                    track->lastWrite = tempFiles[j].last_write;   // ★ 新增
+                    track->displayName = MakeDisplayName(f);      // ★ 改：安全版
                     m_tracks.push_back(std::move(track));
+                    addedAny = true;                              // ★ 新增
                 }
             } // 锁在这里释放
-
             // 给主线程留出时间渲染（你就看到列表一截一截地长出来）
+            if (g_hWnd)
+                PostMessage(g_hWnd, WM_PLAYLIST_UPDATED, 0, 0);
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
+        // 4. ★ 新增：扫完了，把 Init 抢插到第 0 位的那首“归位”
+        const bool needFix = m_needFixOrder.exchange(false);
+        if (addedAny || needFix) {
+            std::unique_lock lock(m_trackMtx);
+            std::stable_sort(m_tracks.begin(), m_tracks.end(),
+                [](const std::unique_ptr<LocalTrackInfo>& a,
+                    const std::unique_ptr<LocalTrackInfo>& b) {
+                        return a->lastWrite > b->lastWrite;   // 修改时间降序，新的在最上面
+                });
+            // ★ 锁释放后通知主程序：列表顺序变了，刷新 + 重新定位当前播放索引
+            //   （有变更回调就在这里调；没有的话见文末）
+        }
         m_isScanning = false;
+        if (g_hWnd) PostMessage(g_hWnd, WM_PLAYLIST_UPDATED, 0, 0);
     }
 
 public:
@@ -162,6 +195,7 @@ public:
         std::string last = cfg.GetValue<std::string>("last_music_local", "");
         if (!last.empty() && std::filesystem::exists(Utf8ToPath(last))) {
             AddSingleTrack(last);
+            m_needFixOrder = true;
         }
 
         // ★ 开启后台疯狂扫描，主线程瞬间返回 true
@@ -177,29 +211,22 @@ public:
     }
 
     void RequestTrackDetails(size_t startIndex, size_t endIndex) override {
-        std::vector<size_t> indicesToLoad;
+        std::vector<std::pair<size_t, std::string>> jobs;   // ★ 索引只当提示，认人靠路径
         {
             std::lock_guard<std::mutex> loadLock(m_loadingMtx);
-            std::shared_lock trackLock(m_trackMtx); // ★ 加上读锁
+            std::shared_lock trackLock(m_trackMtx);
             for (size_t i = startIndex; i < endIndex && i < m_tracks.size(); ++i) {
-                if (!m_tracks[i]->isDetailLoaded && m_loadingIndices.find(i) == m_loadingIndices.end()) {
-                    indicesToLoad.push_back(i);
-                    m_loadingIndices.insert(i);
-                }
+                if (m_tracks[i]->isDetailLoaded) continue;
+                if (m_loadingPaths.insert(m_tracks[i]->filePath).second)
+                    jobs.emplace_back(i, m_tracks[i]->filePath);
             }
         }
+        if (jobs.empty()) return;
 
-        if (indicesToLoad.empty()) return;
-
-        std::thread([this, indicesToLoad]() {
-            for (size_t idx : indicesToLoad) {
-                std::string filePath;
-                {
-                    std::shared_lock trackLock(m_trackMtx); // ★ 读锁
-                    if (idx >= m_tracks.size()) continue;
-                    filePath = m_tracks[idx]->filePath;
-                }
-
+        std::thread([this, jobs]() {
+            for (const auto& job : jobs) {
+                const size_t hint = job.first;
+                const std::string filePath = job.second;
                 std::string displayName = "";
                 PathType path = Utf8ToPath(filePath);
                 if (!path.empty()) {
@@ -216,15 +243,25 @@ public:
                     }
                     catch (...) {}
                 }
-
                 {
                     std::lock_guard<std::mutex> loadLock(m_loadingMtx);
-                    std::unique_lock trackLock(m_trackMtx); // ★ 写锁
-                    if (idx < m_tracks.size()) {
-                        if (!displayName.empty()) m_tracks[idx]->displayName = displayName;
-                        m_tracks[idx]->isDetailLoaded = true;
+                    std::unique_lock trackLock(m_trackMtx);
+                    LocalTrackInfo* t = nullptr;
+                    if (hint < m_tracks.size() && m_tracks[hint]->filePath == filePath) {
+                        t = m_tracks[hint].get();                 // 常态：O(1)
                     }
-                    m_loadingIndices.erase(idx);
+                    else {                                        // ★ 被重排过：兜底找一次
+                        auto it = std::find_if(m_tracks.begin(), m_tracks.end(),
+                            [&](const std::unique_ptr<LocalTrackInfo>& p) {
+                                return p->filePath == filePath;
+                            });
+                        if (it != m_tracks.end()) t = it->get();
+                    }
+                    if (t) {
+                        if (!displayName.empty()) t->displayName = displayName;
+                        t->isDetailLoaded = true;
+                    }
+                    m_loadingPaths.erase(filePath);               // ★ 按路径清除
                 }
             }
             }).detach();
@@ -250,7 +287,9 @@ public:
         return -1;
     }
 
-    int AddTrack(const std::string& filePath) override {
+    int AddTrack(const std::string& rawPath) override {
+        const std::string filePath = NormalizePath(rawPath);   // ★ 新增
+        auto wt = GetWriteTime(filePath);                      // ★ 新增：锁外 IO
         std::unique_lock lock(m_trackMtx);
         if (m_pathSet.count(filePath)) {
             for (size_t i = 0; i < m_tracks.size(); ++i) {
@@ -263,9 +302,8 @@ public:
         track->id = filePath;
         track->filePath = filePath;
         track->isDetailLoaded = false;
-        std::string rel = filePath.substr(m_rootPath.size());
-        if (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
-        track->displayName = rel;
+        track->lastWrite = wt;                            // ★ 新增
+        track->displayName = MakeDisplayName(filePath);    // ★ 改：替掉上面 3 行
         m_tracks.push_back(std::move(track));
         return (int)m_tracks.size() - 1;
     }
@@ -283,7 +321,7 @@ public:
 
     int GetLastIndex() const override {
         auto& cfg = ManageConfig::GetInstance();
-        std::string last = cfg.GetValue<std::string>("last_music_local", "");
+        const std::string last = NormalizePath(cfg.GetValue<std::string>("last_music_local", "")); // ★ 改
         if (last.empty()) return 0;
         std::shared_lock lock(m_trackMtx);
         for (size_t i = 0; i < m_tracks.size(); ++i) {

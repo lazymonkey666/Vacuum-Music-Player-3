@@ -1,7 +1,9 @@
 #include "Initialize.h"
 #include "AppState.h"
+#include <PlaybackStateMachine.h>
 #include "utils.h"
 #include "MainUI.h"
+#include <TagReader.h>
 
 // 内部插件
 #include "MusicSource.h"
@@ -55,6 +57,102 @@ namespace AppInit {
             }
         }
         return true;
+    }
+    void ConfigureStateMachine() {
+
+        g_sm.SetBridges({
+            // ── 资源准备：缓存检查 → 下载 → 读标签 → 封面 ──
+            .prepare = [](int index, std::function<void(PrepareResult)> onDone) {
+    std::thread([index, onDone = std::move(onDone)]() {
+        PrepareResult r;
+        try {
+            if (!g_source) { r.error = "no source"; }
+            else if (!g_source->GetBaseTrack(index)) { r.error = "index out of range"; }
+            else {
+                const BaseTrackInfo* track = g_source->GetBaseTrack(index);
+
+                // ① 命中缓存？
+                PathType cacheW = GetCacheDirectory();
+                PathType pathMp3 = cacheW + Utf8ToPath(track->id + ".mp3");
+                PathType pathFlac = cacheW + Utf8ToPath(track->id + ".flac");
+                std::error_code ec;
+                std::string local;
+                if (std::filesystem::exists(pathFlac, ec) && !ec)
+                    local = PathToUtf8(pathFlac);
+                else if (std::filesystem::exists(pathMp3, ec) && !ec)
+                    local = PathToUtf8(pathMp3);
+
+                // ② 未命中：下载
+                if (local.empty()) {
+                    SetStatus(STATUS_FETCHING_INFORMATION);
+                    PlaybackInfo info = g_source->PreparePlayback(index);
+                    if (!info.isValid) r.error = "invalid playback info";
+                    else {
+                        local = DownloadAndProcessTrack(info);
+                        if (local.empty()) r.error = "download failed";
+                    }
+                }
+
+                // ③ 读元数据 / 歌词 / 封面
+                if (local.empty() && r.error.empty()) r.error = "unknown";
+                if (r.error.empty()) {
+                    PathType w = Utf8ToPath(local);
+                    auto meta = GetMusicMetadata(local);
+                    std::string lrc = GetLyricsFromFile(w);
+                    if (lrc.empty()) {
+                        PathType lp = FindLrcFile(w);
+                        if (!lp.empty()) lrc = ReadTextFile(lp);
+                    }
+
+                    r.ok = true;
+                    r.localPath = local;
+                    r.title = meta.title;
+                    r.artist = meta.artist;
+                    r.album = meta.album;
+                    r.lyrics = lrc;
+                    r.albumArt = ExtractAlbumArt(w);
+                    r.durationMs = GetAudioFileDurationMs(local);
+                }
+            }
+        }
+ catch (const std::exception& e) {
+  r.ok = false; r.error = e.what();
+}
+catch (...) {
+ r.ok = false; r.error = "unknown exception";
+}
+
+// ★ 关键：回到主线程再调 onDone
+AsyncEventManager::GetInstance().PostToMainThread(
+    [onDone = std::move(onDone), r = std::move(r)]() mutable {
+        onDone(std::move(r));
+    });
+}).detach();
+},
+
+// ── 后端：直接转发给 ActiveBackend() ──
+.requestLoad = [](const std::string& localPath, int index) -> uint64_t {
+    auto* be = ActiveBackend();
+    if (!be) return 0;
+    return be->RequestLoad(Utf8ToPath(localPath), (uint64_t)index);
+},
+.requestPlay = [](int index) -> uint64_t {
+    auto* be = ActiveBackend();
+    return be ? be->RequestPlay((uint64_t)index) : 0;
+},
+.requestPause = [](int index) -> uint64_t {
+    auto* be = ActiveBackend();
+    return be ? be->RequestPause((uint64_t)index) : 0;
+},
+.requestSeek = [](uint64_t posMs) -> uint64_t {
+    auto* be = ActiveBackend();
+    return be ? be->RequestSeek(posMs) : 0;
+},
+.requestUnload = []() {
+    auto* be = ActiveBackend();
+    if (be && be->IsLoaded()) be->RequestUnload();
+},
+            });
     }
 
     static void initMusicList() {
@@ -158,6 +256,7 @@ namespace AppInit {
         if (g_source) g_source->SyncPlaylistAsync();
 
         if (!InitPlaybackBackend()) return false;
+        ConfigureStateMachine();
 
         return true;
     }
@@ -194,5 +293,6 @@ namespace AppInit {
         cfg.Save();
         return true;
     }
+
 }
 

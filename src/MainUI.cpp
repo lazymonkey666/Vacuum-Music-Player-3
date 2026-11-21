@@ -10,6 +10,7 @@
 #include <imgui/imgui.h>
 #include <iostream>
 #include <algorithm>
+#include <PlaybackView.h>
 #include <cmath>
 #include <AppState.h>
 
@@ -327,21 +328,7 @@ namespace MainUI {
                 }
                 ImGui::EndListBox();
             }
-            // ★ 进度条更新：从当前活跃后端读
-            if (auto* be = ActiveBackend(); be && be->IsLoaded()) {
-                PlayCurrentMs = be->GetPositionMs();
-                if (PlayMusicLongMs > 0) {
-                    PlayProgressPercent = std::clamp(
-                        (float)PlayCurrentMs / (float)PlayMusicLongMs, 0.0f, 1.0f);
-                }
-                else {
-                    PlayProgressPercent = 0.0f;
-                }
-            }
-            else if (g_loading_music) {
-                PlayCurrentMs = 0;
-                PlayProgressPercent = 0.0f;
-            }
+            
             //if (g_pTaskbarList && g_hWnd && counter == 0) {
             //    if (PlayCurrentMs > 0) {
             //        g_pTaskbarList->SetProgressValue(g_hWnd, PlayCurrentMs, PlayMusicLongMs);
@@ -363,7 +350,7 @@ namespace MainUI {
             }
 
             ImGui::SameLine();
-            if (IsPlaying) {
+            if (PsIsPlaying()) {
                 // 第一个参数是字符串 ID（必须唯一），第二个参数是纹理 ID，第三个是尺寸
                 if (ImGui::ImageButton("pause_btn", (ImTextureID)GetIcon("pause"), ImVec2(16, 16))) {
                     ChangePlayMode();
@@ -493,7 +480,8 @@ namespace MainUI {
 
 
             ImVec2 progressbar_size(-FLT_MIN, -FLT_MIN);
-            ImGui::ProgressBar(PlayProgressPercent, ImVec2(-FLT_MIN, progress_height), "");
+            // ✅ 新
+            ImGui::ProgressBar(PsProgressRatio(), ImVec2(-FLT_MIN, progress_height), "");
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                 float mouseX = ImGui::GetMousePos().x;
                 ImVec2 itemMin = ImGui::GetItemRectMin();
@@ -501,21 +489,18 @@ namespace MainUI {
                 float seekRatio = (mouseX - itemMin.x) / (itemMax.x - itemMin.x);
                 seek(seekRatio);
             }
-            // 生成右侧进度时间文本
-            std::string progress_text = FormatTime(PlayCurrentMs) + " / " + FormatTime(PlayMusicLongMs);
-            std::string now_playing_text = MusicMeta.title;
-            if (!g_loading_music) {
-                // 生成左侧歌曲信息文本
-                if (!MusicMeta.artist.empty()) {
-                    now_playing_text += " - " + MusicMeta.artist;
-                }
-                if (!MusicMeta.album.empty()) {
-                    now_playing_text += " [ " + MusicMeta.album + " ] ";
-                }
+            std::string progress_text = FormatTime(PsPositionMs()) + " / " + FormatTime(PsDurationMs());
+
+            const auto& ps = Ps();
+            std::string now_playing_text = ps.title;
+            if (!PsIsLoading()) {
+                if (!ps.artist.empty()) now_playing_text += " - " + ps.artist;
+                if (!ps.album.empty())  now_playing_text += " [ " + ps.album + " ] ";
             }
             else {
                 now_playing_text = GetStatusText();
             }
+
 
             // 获取进度条区域
             ImVec2 barMin = ImGui::GetItemRectMin();
@@ -633,16 +618,16 @@ namespace MainUI {
                 g_scrollBlockCounter--;
             }
             // ================================================================================
-
+            const auto& lyrics = PsLyrics();
             if (ImGui::BeginListBox("##LyricsList", ImVec2(-FLT_MIN, -FLT_MIN)))
             {
-                if (g_lyrics.empty())
+                if (lyrics.empty())
                 {
                     ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "暂无歌词");
                 }
                 else
                 {
-                    for (int i = 0; i < (int)g_lyrics.size(); ++i)
+                    for (int i = 0; i < (int)lyrics.size(); ++i)
                     {
                         bool isCurrent = (i == g_currentLyricIndex);
 
@@ -657,11 +642,14 @@ namespace MainUI {
                         // ★ 记录当前行的本地 Y 坐标（在画出来之前取）
                         float itemY = ImGui::GetCursorPosY();
 
-                        std::string uniqueLabel = g_lyrics[i].second + "##" + std::to_string(i);
+                        std::string uniqueLabel = lyrics[i].second + "##" + std::to_string(i);
                         if (SelectableWithStyle(uniqueLabel.c_str(), isCurrent, 6.0f))
                         {
-                            float targetPercent = (double)g_lyrics[i].first / PlayMusicLongMs;
-                            seek(targetPercent);
+                            uint64_t dur = PsDurationMs();
+                            if (dur > 0) {
+                                float targetPercent = (float)((double)lyrics[i].first / (double)dur);
+                                seek(targetPercent);
+                            }
                         }
 
                         // 关键：恢复字体

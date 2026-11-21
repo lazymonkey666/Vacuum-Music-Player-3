@@ -7,12 +7,16 @@
 #include <chrono>
 #include <atomic>
 #include <imgui/imgui.h>
+#include <PlaybackStateMachine.h>
 
 #include "StateVar.h"       // 包含我们之前写的 StateVar / StateObject
 #include "MusicSource.h"
 #include "PlaybackBackend.h"
 #include "platform/platform.h"
 #include "ManageConfig.h"
+
+#define WM_UPDATE_ALBUM_ART   (WM_APP + 5)
+#define WM_PLAYLIST_UPDATED (WM_APP + 6)
 
 // ── 1. 全局结构体与枚举 ──
 enum StatusCode {
@@ -25,9 +29,9 @@ enum StatusCode {
 };
 
 struct MusicMetadata {
-    std::string title = "Unknown Title";
-    std::string artist = "Unknown Artist";
-    std::string album = "Unknown Album";
+    std::string   title;
+    std::string   artist;
+    std::string   album;
     TextureHandle albumArtSRV = nullptr;
 };
 
@@ -56,11 +60,6 @@ inline std::shared_ptr<IMusicSource> g_source = nullptr; // 用 shared_ptr 替�
 
 // ── 3. 核心播放状态（原子保护） ──
 inline StateVar<int>      CurrentIndex{ -1 };
-inline StateVar<bool>     IsPlaying{ false };
-inline StateVar<uint64_t> PlayCurrentMs{ 0 };
-inline StateVar<float>    PlayMusicLong{ 0.0f };
-inline StateVar<uint64_t> PlayMusicLongMs{ 1 };
-inline StateVar<float>    PlayProgressPercent{ 0.0f };
 inline StateVar<bool>     g_loading_music{ false };
 inline StateVar<int>      g_PlayOrder{ 0 };
 inline StateVar<int>      g_statusId{ 1 };
@@ -74,16 +73,11 @@ inline StateVar<uint64_t> g_latestPreLoadId{ 0 };
 
 // ── 5. 跨线程共享数据（读写锁保护） ──
 inline MusicMetadata MusicMeta;
-inline std::vector<std::pair<int, std::string>> g_lyrics;
 inline StateVar<int>      g_currentLyricIndex{ -1 };
 inline StateVar<bool>     g_needScrollToLyric{ false };
 
 // 播放缓存（用于 PostPlay 回填）
-inline StateObject<std::string> g_curTitle;
-inline StateObject<std::string> g_curArtist;
-inline StateObject<std::string> g_curAlbum;
-inline StateObject<std::string> g_curLyrics;
-inline StateObject<std::vector<unsigned char>> g_curAlbumArt;
+
 inline StateObject<std::string> g_currentPlayingTrackId;
 
 // ── 6. 配置、主题与常量（大部分初始化后只读，原子保护） ──
@@ -134,6 +128,7 @@ inline int      g_normalWidth = 700;
 inline int      g_normalHeight = 230;
 inline int      g_snapThreshold = 10;
 inline int      g_lastSnapSide = -1;
+inline PlaybackStateMachine g_sm;
 
 inline bool     g_isDragging = false;
 inline POINT    g_dragStartPos = { 0, 0 };

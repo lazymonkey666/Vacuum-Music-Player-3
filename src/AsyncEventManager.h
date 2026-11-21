@@ -119,6 +119,7 @@ public:
     void Post(AsyncEventType type, AsyncEventPayload payload,
         AsyncCompletionCallback onComplete,
         CallbackThread cbThread = CallbackThread::Main);
+    void PostToMainThread(std::function<void()> fn);
 
     // ── 主线程每帧调用（执行 CallbackThread::Main 的回调）──
     void DrainMainThread();

@@ -157,6 +157,11 @@ void AsyncEventManager::DrainMainThread() {
         catch (...) {}
     }
 }
+void AsyncEventManager::PostToMainThread(std::function<void()> fn) {
+    if (stopped_ || !fn) return;
+    std::lock_guard<std::mutex> lk(mainCbMtx_);
+    mainCbs_.push_back({ std::move(fn) });
+}
 
 // ═══════════════════════════════════════════════════════════
 // Worker
