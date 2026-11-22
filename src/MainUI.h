@@ -52,4 +52,6 @@ namespace MainUI {
     bool ResolveIsDark(const std::string& mode);
     void ApplyTheme(const std::string& mode, int opacity);
     uint32_t GetIconColorForTheme(const std::string& mode);
+    void OnAlbumArtReady(AlbumArtAsyncResult* result);
+    void ScheduleAlbumArtUpdate();
 }

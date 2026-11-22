@@ -14,6 +14,8 @@ static bool        g_enable_cache_limit = true;
 static int         g_cache_limit_mb = 2048;
 static bool        g_enable_lyric_translate_split = true;
 static std::string g_activeThemeZip = "";
+static bool g_enable_album_accent = false;
+
 
 SettingWindow::SettingWindow()
     : cfg(ManageConfig::GetInstance())
@@ -62,6 +64,10 @@ SettingWindow::SettingWindow()
         appearance.items.push_back(std::make_unique<SettingItemRadio>(
             g_themeStyle, "theme_style", "主题风格", themeOptions));
     }
+    appearance.items.push_back(std::make_unique<SettingItem<bool>>(
+        g_enable_album_accent, "enable_album_accent",
+        "主题色跟随专辑图\n（使用主题包时无效）"));
+
     categories_.push_back(std::move(appearance));
 
     // ── 关于 ──

@@ -85,3 +85,9 @@ void TrimCache(const PathType& cacheDir, uint64_t limitBytes);
 void EnforceCacheLimit(uint64_t limitMB);
 std::string DownloadAndProcessTrack(const PlaybackInfo& info);
 uint64_t GetAudioFileDurationMs(const std::string& utf8Path);
+// 从封面原始数据提取主色（ARGB 里的 RGB，忽略 alpha）
+uint32_t ExtractDominantColor(const std::vector<unsigned char>& imageData,
+    uint32_t fallback = 0x4A90D9);
+
+// 按深/浅色模式调整颜色（深色提亮、浅色压暗，保证饱和度）
+uint32_t AdaptColorForTheme(uint32_t rgb, bool isDark);

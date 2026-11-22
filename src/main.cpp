@@ -289,78 +289,6 @@ void OnHotkey(int id) {
     }
 }
 
-void ScheduleAlbumArtUpdate() {
-    const auto& s = g_sm.Snap();
-    int taskId = ++g_AsyncTaskId_search;
-
-    // ① 空封面：直接发空结果，让 UI 释放旧纹理
-    if (s.albumArt.empty()) {
-        auto* r = new AlbumArtAsyncResult();
-        r->targetIndex = taskId;
-        if (g_hWnd)
-            PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(r));
-        else
-            delete r;   // 窗口已关，别泄漏
-        return;
-    }
-
-    // ② 拷贝一份给后台线程（s 是引用，不能跨线程持有）
-    auto        raw = s.albumArt;   // vector<unsigned char>
-    std::string t = s.title;
-    std::string a = s.artist;
-    std::string al = s.album;
-
-    std::thread([raw = std::move(raw), t, a, al, taskId]() {
-        // 过期丢弃（快速切歌时，只有最新 taskId 生效）
-        if (taskId != g_AsyncTaskId_search) return;
-
-        auto proc = ProcessAlbumArtWithGradient(raw, 230, 230);
-        if (proc.empty() || taskId != g_AsyncTaskId_search) return;
-
-        auto* r = new AlbumArtAsyncResult();
-        r->width = 230;
-        r->height = 230;
-        r->rgbaData = std::move(proc);
-        r->rawData = raw;
-        r->title = t;
-        r->artist = a;
-        r->album = al;
-        r->targetIndex = taskId;
-
-        if (g_hWnd)
-            PostMessage(g_hWnd, WM_UPDATE_ALBUM_ART, 0, reinterpret_cast<LPARAM>(r));
-        else
-            delete r;
-        }).detach();
-}
-
-void OnAlbumArtReady(AlbumArtAsyncResult* result) {
-    if (!result) return;
-
-    if (result->targetIndex == g_AsyncTaskId_search) {
-        // 1. 移交旧图
-        if (MainUI::g_prevAlbumArt) {
-            ReleaseTexture(MainUI::g_prevAlbumArt);
-            MainUI::g_prevAlbumArt = nullptr;
-        }
-        if (MusicMeta.albumArtSRV) {
-            MainUI::g_prevAlbumArt = MusicMeta.albumArtSRV;
-            MusicMeta.albumArtSRV = nullptr;
-        }
-
-        // 2. 创建新图
-        if (!result->rgbaData.empty()) {
-            MusicMeta.albumArtSRV = CreateTextureFromRGBA(result->rgbaData, result->width, result->height);
-        }
-
-        // 3. 启动动画
-        MainUI::g_albumArtFadeAlpha = 0.0f;
-        MainUI::g_isAlbumArtTransitioning = true;
-        MainUI::g_albumArtTransStartTime = std::chrono::steady_clock::now();
-    }
-    delete result;
-}
-
 // ═══════════════════════════════════════════════════════════
 // 业务消息分发（跨平台，WndProc 和 LnxProc 都调它）
 // ═══════════════════════════════════════════════════════════
@@ -368,7 +296,7 @@ bool HandleAppMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
 
     case WM_UPDATE_ALBUM_ART:
-        OnAlbumArtReady(reinterpret_cast<AlbumArtAsyncResult*>(lParam));
+        MainUI::OnAlbumArtReady(reinterpret_cast<AlbumArtAsyncResult*>(lParam));
         return true;
 
     case WM_HOTKEY:

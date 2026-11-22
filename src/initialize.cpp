@@ -112,6 +112,9 @@ namespace AppInit {
                     r.lyrics = lrc;
                     r.albumArt = ExtractAlbumArt(w);
                     r.durationMs = GetAudioFileDurationMs(local);
+                    if (g_enable_album_accent && !r.albumArt.empty()) {
+                        r.dominantColor = ExtractDominantColor(r.albumArt);
+                    }
                 }
             }
         }
@@ -184,6 +187,8 @@ AsyncEventManager::GetInstance().PostToMainThread(
         g_dark_mode = cfg.GetValue<std::string>("theme_style", "System");
         g_enableSnapToEdge = cfg.GetValue<bool>("enable_snap_to_edge", true);
         g_activeThemeZip = cfg.GetValue<std::string>("active_theme_zip", "");
+        g_enable_album_accent = cfg.GetValue<bool>("enable_album_accent", false);
+
     }
 
     void LoadTheme() {

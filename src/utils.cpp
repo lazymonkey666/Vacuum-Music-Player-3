@@ -449,3 +449,81 @@ std::string DownloadAndProcessTrack(const PlaybackInfo& info) {
     if (g_cache_clean) EnforceCacheLimit(g_cache_limit_mb);
     return localUtf8;
 }
+// ── HSV 工具 ──
+static void RgbToHsv(uint8_t r, uint8_t g, uint8_t b, float& h, float& s, float& v) {
+    float rf = r / 255.0f, gf = g / 255.0f, bf = b / 255.0f;
+    float mx = (std::max)((std::max)(rf, gf), bf);
+    float mn = (std::min)((std::min)(rf, gf), bf);
+    v = mx;
+    float d = mx - mn;
+    s = (mx > 0.0f) ? (d / mx) : 0.0f;
+    if (d < 1e-6f) { h = 0; return; }
+    if (mx == rf)      h = 60.0f * std::fmod((gf - bf) / d, 6.0f);
+    else if (mx == gf) h = 60.0f * ((bf - rf) / d + 2.0f);
+    else               h = 60.0f * ((rf - gf) / d + 4.0f);
+    if (h < 0) h += 360.0f;
+}
+
+static uint32_t HsvToRgb(float h, float s, float v) {
+    float c = v * s;
+    float x = c * (1 - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1));
+    float m = v - c;
+    float r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    auto to8 = [](float f) { return (uint8_t)std::clamp(f * 255.0f, 0.0f, 255.0f); };
+    return ((uint32_t)to8(r + m) << 16) | ((uint32_t)to8(g + m) << 8) | to8(b + m);
+}
+
+uint32_t ExtractDominantColor(const std::vector<unsigned char>& imageData, uint32_t fallback) {
+    if (imageData.empty()) return fallback;
+
+    const int W = 32, H = 32;
+    auto smallImg = DecodeAndScaleImage(imageData, W, H);
+    if (smallImg.size() < (size_t)(W * H * 4)) return fallback;
+
+    struct Bucket { double r = 0, g = 0, b = 0; int count = 0; };
+    std::vector<Bucket> buckets(12);   // 每 30° 一个色相桶
+
+    for (int i = 0; i < W * H; ++i) {
+        const unsigned char* p = smallImg.data() + i * 4;
+        if (p[3] < 128) continue;                       // 透明像素
+        float hh, ss, vv;
+        RgbToHsv(p[0], p[1], p[2], hh, ss, vv);
+        if (ss < 0.20f) continue;                       // 太灰（白/黑/灰）
+        if (vv < 0.15f || vv > 0.95f) continue;         // 太黑 / 太白
+        int idx = std::clamp((int)(hh / 30.0f), 0, 11);
+        buckets[idx].r += p[0];
+        buckets[idx].g += p[1];
+        buckets[idx].b += p[2];
+        buckets[idx].count++;
+    }
+
+    int best = -1, bestCount = 0;
+    for (int i = 0; i < 12; ++i)
+        if (buckets[i].count > bestCount) { bestCount = buckets[i].count; best = i; }
+
+    if (best < 0 || bestCount < 8) return fallback;     // 有效像素太少，用兜底色
+
+    const auto& bk = buckets[best];
+    float hh, ss, vv;
+    RgbToHsv((uint8_t)(bk.r / bk.count), (uint8_t)(bk.g / bk.count), (uint8_t)(bk.b / bk.count),
+        hh, ss, vv);
+    ss = std::clamp(ss * 1.35f, 0.40f, 0.90f);          // 提饱和，让强调色更鲜
+    vv = std::clamp(vv, 0.50f, 0.92f);
+    return HsvToRgb(hh, ss, vv);
+}
+
+uint32_t AdaptColorForTheme(uint32_t rgb, bool isDark) {
+    uint8_t r = (rgb >> 16) & 0xFF, g = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
+    float hh, ss, vv;
+    RgbToHsv(r, g, b, hh, ss, vv);
+    if (isDark) vv = (std::max)(vv, 0.72f);
+    else        vv = (std::min)(vv, 0.62f);
+    ss = (std::max)(ss, 0.45f);
+    return HsvToRgb(hh, ss, vv);
+}

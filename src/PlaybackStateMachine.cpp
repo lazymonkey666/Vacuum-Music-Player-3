@@ -67,10 +67,10 @@ void PlaybackStateMachine::Stop() {
 void PlaybackStateMachine::EnterPreparing(int index, const std::string& trackId) {
     ++m_gen;
 
-    // ★ 保留旧歌词和旧封面，避免切歌瞬间闪白 + 避免纹理过早释放
     PlaybackSnapshot fresh;
     fresh.lyrics = std::move(m_snap.lyrics);
     fresh.albumArt = std::move(m_snap.albumArt);
+    fresh.dominantColor = m_snap.dominantColor;    // ★ 保留上一首的颜色
     m_snap = std::move(fresh);
 
     m_snap.state = PlayState::Preparing;
@@ -89,9 +89,10 @@ void PlaybackStateMachine::EnterPreparing(int index, const std::string& trackId)
         m_snap.title = r.title;
         m_snap.artist = r.artist;
         m_snap.album = r.album;
-        m_snap.lyrics = r.lyrics;      // ← 新歌词覆盖旧歌词
-        m_snap.albumArt = r.albumArt;    // ← 新封面覆盖旧封面（可能为空）
+        m_snap.lyrics = r.lyrics;
+        m_snap.albumArt = r.albumArt;
         m_snap.durationMs = r.durationMs;
+        m_snap.dominantColor = r.dominantColor ? r.dominantColor : 0x4A90D9;   // ★
         EnterLoading();
         });
 }

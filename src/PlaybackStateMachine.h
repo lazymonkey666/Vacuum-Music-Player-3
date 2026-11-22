@@ -29,6 +29,8 @@ struct PlaybackSnapshot {
     std::string  errorMsg;
 
     uint64_t     revision = 0;    // 每次变化 +1，UI 靠它判断是否刷新
+    uint32_t     dominantColor = 0x4A90D9;   // ★ 默认蓝
+
 };
 
 // prepare 返回的详情
@@ -39,6 +41,7 @@ struct PrepareResult {
     std::string  title, artist, album, lyrics;
     std::vector<unsigned char> albumArt;
     uint64_t     durationMs = 0;
+    uint32_t     dominantColor = 0;
 };
 
 class PlaybackStateMachine {

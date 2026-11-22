@@ -113,6 +113,10 @@ inline int      g_windowSide = 0;
 
 inline PlaybackStateMachine g_sm;
 
+inline StateVar<bool> g_enable_album_accent{ false };
+inline StateVar<bool>     g_accentFromAlbum{ false };     // true = 强调色来自专辑
+inline StateVar<uint32_t> g_albumAccentRaw{ 0x4A90D9 };   // 专辑原始主色（未适配深浅）
+
 inline std::vector<PlaybackDeviceInfo> s_cachedSonosDevices;
 inline StateVar<int> s_selectedSonosDeviceIdx{ -1 };
 

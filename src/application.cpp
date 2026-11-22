@@ -14,6 +14,7 @@
 #include <WindowAnimator.h>
 #include <utils.h>
 #include <imgui/imgui.h>
+#include <utils.h>
 
 #include <thread>
 #include <chrono>
@@ -28,6 +29,28 @@ Application& Application::Get() {
     static Application inst;
     return inst;
 }
+
+static void ApplyAlbumAccentColor(uint32_t rgb) {
+    if (ThemePackManager::GetInstance().GetActive()) return;
+
+    const std::string mode = g_dark_mode.Get();
+    bool isDark;
+    if (mode == "Dark")  isDark = true;
+    else if (mode == "Light") isDark = false;
+    else                      isDark = IsDarkModeByRegistry();
+
+    uint32_t adapted = AdaptColorForTheme(rgb, isDark);
+
+    g_accent = ImVec4(
+        ((adapted >> 16) & 0xFF) / 255.0f,
+        ((adapted >> 8) & 0xFF) / 255.0f,
+        (adapted & 0xFF) / 255.0f,
+        1.0f);
+
+    MainUI::UpdateImGuiStyle();
+}
+
+
 
 // ═══════════════════════════════════════════════════════════
 // 平台差异（仅 3 处）
@@ -142,10 +165,23 @@ int Application::Run(int argc, char** argv) {
         static std::vector<unsigned char> lastArt;
         if (s.albumArt != lastArt) {
             lastArt = s.albumArt;
-            extern void ScheduleAlbumArtUpdate();
-            ScheduleAlbumArtUpdate();
+            MainUI::ScheduleAlbumArtUpdate();
+        }
+
+        // ★ 强调色：直接读 snapshot，零线程、零判重
+        static uint32_t lastAccent = 0;
+        if (g_enable_album_accent
+            && !ThemePackManager::GetInstance().GetActive()
+            && s.dominantColor != lastAccent) {
+            lastAccent = s.dominantColor;
+            g_albumAccentRaw = s.dominantColor;
+            g_accentFromAlbum = true;                   // ★
+            MainUI::UpdateImGuiStyle();   // 或直接 MainUI::UpdateImGuiStyle();
         }
         };
+
+
+
 
     if (g_source) CurrentIndex = g_source->GetLastIndex();
     UpdateCurrentPlaying(CurrentIndex);
@@ -222,6 +258,11 @@ int Application::MainLoop() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             MainUI::ApplyTheme(g_dark_mode.Get(), g_opacity);
             MainUI::UpdateImGuiStyle();
+
+            if (ThemePackManager::GetInstance().GetActive() || !g_enable_album_accent) {
+                g_accent = ImVec4(0.29f, 0.56f, 0.85f, 1.0f);   // 默认蓝
+                MainUI::UpdateImGuiStyle();
+            }
 
             // ③ 改完 acrylic 再等 DWM 完成重排，期间不渲染
             std::this_thread::sleep_for(std::chrono::milliseconds(150));
