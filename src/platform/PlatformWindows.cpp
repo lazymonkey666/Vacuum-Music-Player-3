@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "platform.h"
+#include <AppState.h>      // MusicMeta / g_iconCache
+#include <IconManager.h>   // IconManager
 #include <MainUI.h>
 
 #if PLATFORM_WINDOWS
@@ -34,7 +36,6 @@ HANDLE g_hMutex = NULL;
 // 平台内部状态（main.cpp 无需访问）
 static winrt::Windows::Media::Playback::MediaPlayer        g_mediaPlayer{ nullptr };
 static winrt::Windows::Media::SystemMediaTransportControls g_smtc{ nullptr };
-static UINT           g_uTaskbarBtnMsg = 0;
 
 // ═══════════════════════════════════════════════════════════
 // 1. 窗口外观
@@ -158,15 +159,34 @@ bool CreateDeviceD3D(HWND hWnd) {
         NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
         featureLevels, 1, D3D11_SDK_VERSION,
         &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
-    if (FAILED(hr)) return false;
+
+    if (FAILED(hr)) {
+        // ★ 新增：失败时把半初始化的指针清掉，否则下一轮会拿着脏指针继续
+        if (g_pSwapChain) { g_pSwapChain->Release();        g_pSwapChain = nullptr; }
+        if (g_pd3dDevice) { g_pd3dDevice->Release();        g_pd3dDevice = nullptr; }
+        if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
+        OutputDebugStringA(("[D3D] CreateDeviceAndSwapChain failed hr=" + std::to_string(hr) + "\n").c_str());
+        return false;
+    }
 
     ID3D11Texture2D* pBackBuffer = nullptr;
     hr = g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) {
+        if (g_pSwapChain) { g_pSwapChain->Release();        g_pSwapChain = nullptr; }
+        if (g_pd3dDevice) { g_pd3dDevice->Release();        g_pd3dDevice = nullptr; }
+        if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
+        return false;
+    }
 
     hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
     pBackBuffer->Release();
-    return SUCCEEDED(hr);
+    if (FAILED(hr)) {
+        if (g_pSwapChain) { g_pSwapChain->Release();        g_pSwapChain = nullptr; }
+        if (g_pd3dDevice) { g_pd3dDevice->Release();        g_pd3dDevice = nullptr; }
+        if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
+        return false;
+    }
+    return true;
 }
 
 // ─── WIC 解码 → D3D11 纹理 ───
@@ -1292,5 +1312,36 @@ std::string PickFileDialog(WindowHandle hwndOwner, const std::string& filter, co
     CoUninitialize();
     return filePath;
 }
+
+void RecreateD3DDevice(WindowHandle hWnd) {
+    OutputDebugStringA("[D3D] === Recreate begin ===\n");
+
+    ImGui_ImplDX11_Shutdown();
+    OutputDebugStringA("[D3D] ImGui DX11 shutdown ok\n");
+
+    g_iconCache.clear();
+    IconManager::GetInstance().Shutdown();
+    if (MusicMeta.albumArtSRV) { ReleaseTexture(MusicMeta.albumArtSRV); MusicMeta.albumArtSRV = nullptr; }
+    if (MainUI::g_prevAlbumArt) { ReleaseTexture(MainUI::g_prevAlbumArt); MainUI::g_prevAlbumArt = nullptr; }
+    OutputDebugStringA("[D3D] textures released\n");
+
+    if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
+    if (g_pSwapChain) { g_pSwapChain->Release();           g_pSwapChain = nullptr; }
+    if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release();    g_pd3dDeviceContext = nullptr; }
+    if (g_pd3dDevice) { g_pd3dDevice->Release();           g_pd3dDevice = nullptr; }
+    OutputDebugStringA("[D3D] device released\n");
+
+    if (!CreateDeviceD3D(hWnd)) {
+        OutputDebugStringA("[D3D] CreateDeviceD3D FAILED\n");
+        return;
+    }
+    OutputDebugStringA("[D3D] device created\n");
+
+    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+    ImGui_ImplDX11_CreateDeviceObjects();
+    OutputDebugStringA("[D3D] === Recreate done ===\n");
+}
+
+
 
 #endif // PLATFORM_WINDOWS

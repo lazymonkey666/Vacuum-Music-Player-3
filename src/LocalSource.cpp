@@ -2,7 +2,7 @@
 #define NOMINMAX
 #include "MusicSource.h"
 #include <platform/platform.h>
-#include <manageconfig.h>
+#include <ManageConfig.h>
 #include <filesystem>
 #include <algorithm>
 #include <thread>

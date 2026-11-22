@@ -1,14 +1,23 @@
 ﻿/*
-* FILENAME:MAIN.CPP
-* THIS IS THE MAIN FILE OF THE VACUUM MUSIC PLAYER
-author:lazymonkey666(https://github.com/lazymonkey666;https://lazymonkey666.github.io/)
-
-https://github.com/lazymonkey666/Vacuum-Music-Player-3 
-
-license:GPL-3.0 license
-
-2026.4 Version 3 (CPP VERSION)
-*/
+ * Vacuum Music Player 3  —  main.cpp
+ * ------------------------------------------------------------------
+ * 程序入口：窗口创建、主消息循环与应用生命周期调度。
+ *
+ * Version 3 (C++ rewrite)
+ * Date    : 2026-04
+ * Author  : lazymonkey666
+ *           https://github.com/lazymonkey666
+ *           https://lazymonkey666.github.io/
+ * Repo    : https://github.com/lazymonkey666/Vacuum-Music-Player-3
+ *
+ * Copyright (c) 2026 lazymonkey666
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * This program is free software, distributed WITHOUT ANY WARRANTY.
+ * See the GNU General Public License for more details.
+ * You should have received a copy of the GPL along with this program
+ * (see the LICENSE file); if not, see <https://www.gnu.org/licenses/>.
+ */
 
 #define MINIAUDIO_IMPLEMENTATION
 
@@ -59,12 +68,14 @@ license:GPL-3.0 license
 
 #include <PlaybackView.h>
 
-#include <APPState.h>
+#include <AppState.h>
 #include <initialize.h>
 #include <MainUI.h>
 #include <utils.h>
 
 #include <WindowAnimator.h>
+#include <application.h>
+
 
 #define HOTKEY_NEXT      1001
 #define HOTKEY_PREV      1002
@@ -247,31 +258,6 @@ void AutoPlayNextSong() {
     UpdateCurrentPlaying(nextIndex);
 }
 
-// 根据 mode 和系统状态，算出该用深色还是浅色背景
-bool ResolveIsDark(const std::string& mode) {
-    if (mode == "Dark")   return true;
-    if (mode == "Light")  return false;
-    return IsDarkModeByRegistry();   // System
-}
-
-// 应用主题（纯副作用，无返回值）
-void ApplyTheme(const std::string& mode, int opacity) {
-    bool isDark = ResolveIsDark(mode);
-    if (isDark) {
-        EnableAcrylic(g_hWnd, (uint8_t)opacity, 0x222222);
-        g_iconColor = 0xFFFFFF;
-    }
-    else {
-        EnableAcrylic(g_hWnd, (uint8_t)opacity, 0xFFFFFF);
-        g_iconColor = 0x222222;
-    }
-}
-
-// 获取图标颜色（纯函数，无副作用）
-uint32_t GetIconColorForTheme(const std::string& mode) {
-    return ResolveIsDark(mode) ? 0xFFFFFF : 0x222222;
-}
-
 void OnMediaNext() {
     if (!g_source || g_source->GetCount() == 0) return;
     if (CurrentIndex + 1 < (int)g_source->GetCount()) {
@@ -303,7 +289,7 @@ void OnHotkey(int id) {
     }
 }
 
-static void ScheduleAlbumArtUpdate() {
+void ScheduleAlbumArtUpdate() {
     const auto& s = g_sm.Snap();
     int taskId = ++g_AsyncTaskId_search;
 
@@ -457,35 +443,40 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     }
     case WM_SETTINGCHANGE:
     {
-        ApplyTheme(g_dark_mode.Get(), g_opacity);
-        IconManager::GetInstance().SetThemeColor(g_iconColor);
-        g_needUpdateStyle = true;
-        InvalidateRect(hWnd, NULL, TRUE);
+        g_needUpdateStyle = true;      // ★ 只设 flag
+        break;
     }
     break;   // 必须 break，防止穿透
     case WM_DWMCOLORIZATIONCOLORCHANGED:
         // 强调色改变时（Windows 10/11）
         g_needUpdateStyle = true;
-        InvalidateRect(hWnd, NULL, TRUE);
         break;
     case WM_SIZE:
-        // 窗口大小改变时调整交换链缓冲区
         if (g_pSwapChain && wParam != SIZE_MINIMIZED) {
-            if (g_mainRenderTargetView) {
-				g_mainRenderTargetView->Release();
-                g_mainRenderTargetView = nullptr;
+            if (g_pd3dDevice->GetDeviceRemovedReason() != S_OK) {
+                RecreateD3DDevice(hWnd);
+                break;
             }
+            if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
             UINT width = LOWORD(lParam);
             UINT height = HIWORD(lParam);
-            g_pSwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
-            // 重新创建渲染目标视图
-            ID3D11Texture2D* pBackBuffer = nullptr;
-            if (SUCCEEDED(g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer)))) {
-                g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
-				pBackBuffer->Release();
-            }   
+            if (width == 0 || height == 0) break;
+
+            HRESULT hr = g_pSwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+            if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
+                RecreateD3DDevice(hWnd);
+                break;
+            }
+            if (SUCCEEDED(hr)) {
+                ID3D11Texture2D* pBackBuffer = nullptr;
+                if (SUCCEEDED(g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer)))) {
+                    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
+                    pBackBuffer->Release();
+                }
+            }
         }
         break;
+
 
 
     case WM_RBUTTONDOWN: {
@@ -535,7 +526,7 @@ bool seek(float seekRatio) {
 }
 
 
-static void RegisterAsyncHooks() {
+void RegisterAsyncHooks() {
     auto& em = AsyncEventManager::GetInstance();
 
     // ── 全局兜底：任何事件失败都打日志 ──
@@ -615,242 +606,14 @@ static void RegisterAsyncHooks() {
             return EventOutcome::Handled;
         });
 
-
 }
-
-
-
 #if PLATFORM_WINDOWS
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    g_hMutex = CreateMutexA(NULL, FALSE, "LazyMonkey666_VacuumMusicPlayer_Mutex");
-    if (g_hMutex == NULL) {
-        // 创建失败（系统错误），可以继续或退出，但通常不会发生
-        ShowMessageBox("错误", "程序创建失败，程序可能已运行");
-        return 1;
-    }
-    if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        // 已有实例在运行，弹出提示并退出
-        ShowMessageBox("提示", "程序已经在运行中");
-        CloseHandle(g_hMutex);
-        return 0;
-    }
-    const std::string CLASS_NAME = "VacuumMusicPlayer";
-    HRESULT hr = SetCurrentProcessExplicitAppUserModelID(L"LazyMonkey666.VacuumMusicPlayer");
-    WSADATA wsaData;
-    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (result != 0) {
-        ShowMessageBox("错误", "WSAStartup 失败！");
-        return 1;
-    }
-
-    RegisterAsyncHooks();          // ★ 新增：注册事件订阅
-    AsyncEventManager::GetInstance().Start();   // ★ 启动 worker
-    PlaybackServiceRegistry::GetInstance().EnableDefaults();//启动服务
-
-    if (!g_apiAddr.Get().empty() && g_online_player) {
-        NeteaseAPIManager::GetInstance().SetBaseURL(g_apiAddr.Get());
-    }
-    else if(g_online_player) {
-        ShowMessageBox("退出", "未配置网易云歌单ID或API地址配置错误（有可能已经失效），程序将退出");
-        PostMessage(g_hWnd, WM_CLOSE, 0, 0);
-    }
-    srand(time(NULL));
-    if (FAILED(hr)) {
-        // 如果设置失败，可以输出调试信息，但不影响程序继续运行
-        OutputDebugString(L"Failed to set AppUserModelID\n");
-    }
-
-    if (g_source) {
-        g_source->SyncPlaylistAsync();
-    }
-    if (!AppInit::InitCore()) return 1;
-    try { winrt::init_apartment(); }//winrt初始化
-    catch (...) { OutputDebugStringA("winrt没有初始化\n"); }
-    static SettingWindow settings;
-    if (!AppInit::InitUI(CLASS_NAME)) return 1;
-    // ★ 新增：绑定"歌播完了 → 算下一首"
-    g_sm.onTrackEnded = []() { AutoPlayNextSong(); };
-
-    // ★ 新增：绑定"播放失败 → 计数 + 跳过"（见步骤 ⑥ 的 lambda，从这调用）
-    g_sm.onPlayFailed = []() {
-        static int      consecutiveFails = 0;
-        static uint64_t lastFailTime = 0;
-
-        uint64_t now = GetTickCount64();
-        // 距离上次失败超过 5 秒，认为用户重新操作了，重置计数
-        if (now - lastFailTime > 5000) consecutiveFails = 0;
-        lastFailTime = now;
-
-        if (consecutiveFails < 10) {
-            consecutiveFails++;
-            OutputDebugStringA(("[onPlayFailed] 连续失败 " +
-                std::to_string(consecutiveFails) + " 次，尝试自动切换下一首\n").c_str());
-
-            // 延时切歌：避免请求太快被服务器风控，也避免 UI 瞬间乱跳
-            std::thread([]() {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                if (g_hWnd) PostMessage(g_hWnd, WM_APP_SMTC_NEXT, 0, 0);
-                }).detach();
-        }
-        else {
-            consecutiveFails = 0;
-            ShowMessageBox("播放停止", "连续多首歌曲无法播放已停止自动跳过。");
-        }
-        };
-
-    // ★ 状态机状态变化 → 只触发真正的副作用（不再镜像任何变量）
-    g_sm.onStateChanged = []() {
-        const auto& s = g_sm.Snap();
-
-        // 唯一还需要侦听的：封面变了 → 触发渐变
-        static std::vector<unsigned char> lastArt;
-        if (s.albumArt != lastArt) {
-            lastArt = s.albumArt;
-            ScheduleAlbumArtUpdate();
-        }
-        };
-
-
-    // ★ 恢复之前的修复：重排后重新定位
-    if (g_source) CurrentIndex = g_source->GetLastIndex();
-    if (ThemePackManager::GetInstance().GetActive()) {
-        g_iconCache.clear(); // 清理可能提前生成的默认图标
-        MainUI::UpdateImGuiStyle();  // 强制把主题颜色应用进 ImGuiStyle
-        // 如果主题包里图标颜色需要跟随主题，这里也可以重新设置
-        // IconManager::GetInstance().SetThemeColor(g_iconColor); 
-    }
-    UpdateCurrentPlaying(CurrentIndex);
-    InitTaskbarProgress(g_hWnd);
-    IconManager::GetInstance().Initialize();
-    IconManager::GetInstance().SetThemeColor(g_iconColor);
-
-    
-
-    RECT rc;
-    GetWindowRect(g_hWnd, &rc);
-    g_normalWidth = rc.right - rc.left;
-    g_normalHeight = rc.bottom - rc.top;
-
-
-    int counter = 0;
-    MSG msg{};
-    //进入消息循环
-    while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-            continue;
-        }
-        AsyncEventManager::GetInstance().DrainMainThread();
-
-        if (g_sm.IsPlaying() && ActiveBackend() && ActiveBackend()->IsLoaded()) {
-            g_sm.UpdatePosition(ActiveBackend()->GetPositionMs());
-        }
-
-        if (g_needUpdateStyle) {
-            g_iconCache.clear();
-            ApplyTheme(g_dark_mode.Get(), g_opacity);
-            IconManager::GetInstance().SetThemeColor(g_iconColor);
-            MainUI::UpdateImGuiStyle();
-            g_needUpdateStyle = false;
-
-
-            // 如果主题里涉及背景图，也可以在这里重新加载
-            // ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
-        }
-        if (ActiveBackend() && ActiveBackend()->IsLoaded()) {
-            int newIndex = PsCurrentLyricIndex();
-            // 找到最后一个时间 <= currentMs 的行
-            if (newIndex != g_currentLyricIndex) {
-                g_currentLyricIndex = newIndex;
-                g_needScrollToLyric = true;
-            }
-        }
-        // 检查是否超时（3秒无操作）
-        counter++;
-        if (counter >= 60) {
-            counter = 0;
-        }
-
-        if (MainUI::g_scrollBlockCounter > 0) {
-            MainUI::g_scrollBlockCounter--;
-        }
-        if (counter % 60 == 0) {   // 每秒一次
-            PlaybackServiceRegistry::GetInstance().Tick(PsPositionMs(), PsIsPlaying());
-        }
-        
-        if (!g_pd3dDevice || !g_pSwapChain || !g_mainRenderTargetView || !g_pd3dDeviceContext)
-        {
-            // D3D资源残缺，暂时不渲染，等待重建完成
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
-        }
-
-        if (WindowAnimator::Get().IsHidden() && !WindowAnimator::Get().IsAnimating()) {
-            // 隐藏且无动画时限制帧率
-            static auto lastRender = std::chrono::steady_clock::now();
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastRender).count();
-            if (elapsed < 50) { // 20fps
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                continue;
-            }
-            lastRender = now;
-        }
-
-        ImGui_ImplDX11_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-
-        // 渲染 ImGui 界面
-        MainUI::RenderFrame(counter, settings);
-        
-        const float clear[4] = { 0, 0, 0, 0 };
-        g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);
-        g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-        HRESULT hr = g_pSwapChain->Present(1, 0);
-        // 检测 D3D11 设备丢失
-        if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
-            // 释放 ImGui D3D11 后端资源
-            ImGui_ImplDX11_Shutdown();
-            // 释放原有 D3D 资源
-            if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
-            if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
-            if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
-            if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
-
-            // 重新创建设备
-            if (!CreateDeviceD3D(g_hWnd)) {
-                ShowMessageBox("错误", "D3D 设备恢复失败，程序将退出");
-                PostQuitMessage(0);
-                break;
-            }
-            // 重新初始化 ImGui D3D11 后端
-            ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-            // 注意：ImGui_ImplWin32_Init 不需要重新调用，窗口句柄未变
-        }
-
-    }
-
-    ImGui_ImplDX11_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-
-    if (g_mainRenderTargetView) g_mainRenderTargetView->Release();
-    if (g_pSwapChain) g_pSwapChain->Release();
-    if (g_pd3dDeviceContext) g_pd3dDeviceContext->Release();
-    if (g_pd3dDevice) g_pd3dDevice->Release();
-
-    CleanupWindowPlat();
-    return 0;
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+    return Application::Get().Run(0, nullptr);
 }
-
 #endif
 #if PLATFORM_LINUX
 bool LnxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    // ─── 业务消息（和 WndProc 里完全一致）───
     if (HandleAppMessage(msg, wParam, lParam))
         return true;
 
@@ -860,44 +623,16 @@ bool LnxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         return true;
 
     case WM_RBUTTONDOWN: {
-        g_isDragging = true;
-        g_dragStartPos = GetMousePosPlat();          // 鼠标按下时的屏幕坐标
-        RECT rc = GetWindowRectPlat(hWnd);
-        g_windowStartPos.x = rc.left;                // 窗口按下时的屏幕位置
-        g_windowStartPos.y = rc.top;
+        POINT p = GetMousePosPlat();
+        WindowAnimator::Get().BeginDrag(p);
         CaptureMouse(hWnd);
         return true;
     }
 
     case WM_MOUSEMOVE: {
-        if (g_isDragging) {
-            POINT curPos = GetMousePosPlat();
-
-            // ★ 绝对拖拽：始终基于"按下时的基准"计算，不累加
-            int dx = curPos.x - g_dragStartPos.x;
-            int dy = curPos.y - g_dragStartPos.y;
-            int newX = g_windowStartPos.x + dx;
-            int newY = g_windowStartPos.y + dy;
-
-            // 吸附
-            RECT workArea = GetWorkAreaPlat();
-            RECT rc = GetWindowRectPlat(hWnd);
-            int winWidth  = rc.right - rc.left;
-            int winHeight = rc.bottom - rc.top;
-
-            if (g_enableSnapToEdge) {
-                if (newX <= workArea.left + g_snapThreshold) newX = workArea.left;
-                else if (newX + winWidth >= workArea.right - g_snapThreshold)
-                    newX = workArea.right - winWidth;
-                if (newY <= workArea.top + g_snapThreshold) newY = workArea.top;
-                else if (newY + winHeight >= workArea.bottom - g_snapThreshold)
-                    newY = workArea.bottom - winHeight;
-            }
-
-            MoveWindowPlat(hWnd, newX, newY);
-
-            // ★ 关键：不要更新 g_dragStartPos / g_windowStartPos！
-            //    它们保持"按下时的基准"不变，这样每次算的都是绝对位置
+        if (WindowAnimator::Get().IsDragging()) {
+            POINT p = GetMousePosPlat();
+            WindowAnimator::Get().UpdateDrag(p);
             return true;
         }
         break;
@@ -908,8 +643,8 @@ bool LnxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
     case WM_RBUTTONUP:
     case WM_LBUTTONUP:
-        if (g_isDragging) {
-            OnDragEnd();
+        if (WindowAnimator::Get().IsDragging()) {
+            WindowAnimator::Get().EndDrag();
             return true;
         }
         break;
@@ -918,158 +653,12 @@ bool LnxProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         Destroy(hWnd);
         return true;
     }
-
     return false;
 }
-
-int main(int argc, char** argv) {
-    std::cout << "[Test] argc = " << argc << std::endl;
-    for (int i = 0; i < argc; i++) {
-        std::cout << "[Test] argv[" << i << "] = " << argv[i] << std::endl;
-    }
-    OutputDebugStringA("[main] Vacuum Music Player (Linux) starting...\n");
-    const std::string CLASS_NAME = "VacuumMusicPlayer";
-#if _DEBUG
-    setenv("DISPLAY", ":0", 1);
 #endif
-    const char* display = std::getenv("DISPLAY");
-    std::cout << "[Debug] Current DISPLAY env: " << (display ? display : "NULL") << std::endl;
-    signal(SIGPIPE, SIG_IGN);
 
-    if (!AcquireSingleInstanceLock()) {
-        ShowMessageBox("提示", "程序已经在运行中");
-        return 0;
-    }
-
-    if (!InitNetwork()) {
-        ShowMessageBox("错误", "网络初始化失败");
-        return 1;
-    }
-
-    ReadConfig();
-    RegisterMusicSources();
-
-
-    if (!g_apiAddr.empty() && g_online_player) {
-        NeteaseAPIManager::GetInstance().SetBaseURL(g_apiAddr);
-    }
-
-    if (!g_sonos) {
-        g_sonos = std::make_unique<SonosController>();
-        g_sonos->Initialize();
-    }
-    srand(time(NULL));
-    initMusicList();
-    if (!InitPlayerEngine()) return 1;
-
-    InitUserCookie();
-    static SettingWindow settings;
-
-    if (!InitWindow(CLASS_NAME)) return 1;
-    InitHotkey(g_hWnd);
-    
-
-    // TODO: 接 GLFW + ImGui OpenGL3 后端
-    PrepareImGui();
-    LoadTheme();
-    if (ThemePackManager::GetInstance().GetActive()) {
-        g_iconCache.clear(); // 清理可能提前生成的默认图标
-        UpdateImGuiStyle();  // 强制把主题颜色应用进 ImGuiStyle
-        // 如果主题包里图标颜色需要跟随主题，这里也可以重新设置
-        // IconManager::GetInstance().SetThemeColor(g_iconColor); 
-    }
-
-    UpdateCurrentPlaying(CurrentIndex);
-    StartSearchSonos();
-
-    int counter = 0;
-    MSG msg{};
-    while (msg.message != WM_QUIT) {
-        LnxProcessTimers();
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-            if (msg.message == WM_QUIT) break;
-            LnxProc(g_hWnd, msg.message, msg.wParam, msg.lParam);   // LnxProc 内部会先调 HandleAppMessage
-            continue;
-        }
-        if (g_needUpdateStyle) {
-            g_iconCache.clear();
-            ApplyTheme(g_dark_mode, g_opacity);
-            IconManager::GetInstance().SetThemeColor(g_iconColor);
-            UpdateImGuiStyle();
-            g_needUpdateStyle = false;
-
-
-            // 如果主题里涉及背景图，也可以在这里重新加载
-            // ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
-        }
-
-        if (!g_loading_music) {
-            if (ma_sound_at_end(&g_CurrentSound) == MA_TRUE && IsPlaying == true && !g_sonos_connect) {
-                ma_sound_stop(&g_CurrentSound);
-                AutoPlayNextSong();
-            }
-        }
-        LnxPollEvents();
-        LnxPollMouse();
-        LnxPollX11Events();   
-
-
-        // 歌词滚动逻辑
-        if ((g_IsSoundLoaded && !g_lyrics.empty()) ||
-            (g_sonos_connect && !g_loading_music && !g_lyrics.empty())) {
-            ma_uint64 currentMs = PlayCurrentMs;
-            int newIndex = -1;
-            for (int i = 0; i < (int)g_lyrics.size(); ++i) {
-                if (g_lyrics[i].first <= currentMs) newIndex = i;
-                else break;
-            }
-            if (newIndex != g_currentLyricIndex) {
-                g_currentLyricIndex = newIndex;
-                g_needScrollToLyric = true;
-            }
-        }
-
-        counter++;
-        if (counter >= 60) counter = 0;
-        if (g_scrollBlockCounter > 0) g_scrollBlockCounter--;
-
-        if (amllplayer && counter == 0) {
-            amllplayer->sendProgress(PlayCurrentMs);
-            if (IsPlaying == false) amllplayer->sendPaused();
-            else amllplayer->sendResumed();
-        }
-
-        if (amllplayer && counter == 0) {
-            AMLLCommand cmd = amllplayer->getNextCommand();
-            switch (cmd) {
-                case AMLLCommand::Pause:    ChangePlayMode(); break;
-                case AMLLCommand::Resume:   ChangePlayMode(); break;
-                case AMLLCommand::Forward:  CurrentIndex++; UpdateCurrentPlaying(CurrentIndex); break;
-                case AMLLCommand::Backward: CurrentIndex--; UpdateCurrentPlaying(CurrentIndex); break;
-                case AMLLCommand::Seek: {
-                    uint64_t seekPos = amllplayer->getPendingSeek();
-                    if (seekPos == UINT64_MAX) break;
-                    double ratio = static_cast<double>(seekPos) / PlayMusicLongMs;
-                    if (ratio < 0.0) ratio = 0.0;
-                    if (ratio > 1.0) ratio = 1.0;
-                    seek(ratio);
-                    break;
-                }
-            }
-        }
-        if (!g_isWindowHidden) {
-            LnxBeginFrame();
-            RenderFrame(counter, settings);
-            LnxEndFrame();
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-    }
-
-    CleanupNetwork();
-    return 0;
+#if PLATFORM_LINUX
+int main(int argc, char** argv) {
+    return Application::Get().Run(argc, argv);
 }
-
-
-#endif // PLATFORM_LINUX
+#endif

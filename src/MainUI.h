@@ -49,4 +49,7 @@ namespace MainUI {
     void TriggerScrollToCurrent();
     void ClearSearchState();
     void UpdateImGuiStyle();
+    bool ResolveIsDark(const std::string& mode);
+    void ApplyTheme(const std::string& mode, int opacity);
+    uint32_t GetIconColorForTheme(const std::string& mode);
 }

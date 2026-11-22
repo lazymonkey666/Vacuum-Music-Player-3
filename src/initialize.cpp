@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "Initialize.h"
+#include "initialize.h"
 #include "AppState.h"
 #include <PlaybackStateMachine.h>
 #include "utils.h"
@@ -21,7 +21,6 @@
 
 // 外部业务函数声明（后续抽离到 PlaybackController 中）
 extern void AutoPlayNextSong();
-extern void ApplyTheme(const std::string& mode, int opacity);
 
 
 namespace AppInit {
@@ -29,20 +28,20 @@ namespace AppInit {
     // ═══════════════════════════════════════════════════════════
     // 内部辅助函数
     // ═══════════════════════════════════════════════════════════
-    static void RegisterMusicSources() {
+    void RegisterMusicSources() {
         auto& reg = MusicSourceRegistry::GetInstance();
         reg.Register({ "local",  "本地播放",       CreateLocalSource });
         reg.Register({ "online", "在线[网易云]", CreateNeteaseSource });
     }
 
-    static void RegisterPlaybackSystems() {
+    void RegisterPlaybackSystems() {
         PlaybackBackendRegistry::GetInstance().Register(
             { "miniaudio", "本机扬声器", CreateMiniaudioBackend });
         PlaybackBackendRegistry::GetInstance().Register(
             { "sonos",     "Sonos 音响", CreateSonosBackend });
     }
 
-    static void RegisterServices() {
+    void RegisterServices() {
         auto& reg = PlaybackServiceRegistry::GetInstance();
         reg.Register({ "smtc", "系统媒体控制", "", true, CreateSmtcService, false });
         reg.Register({ "amll", "AMLL 歌词同步", "service_amll_enabled", false, CreateAMLLService, true });
@@ -171,7 +170,7 @@ AsyncEventManager::GetInstance().PostToMainThread(
         if (g_source->GetCount() == 0) CurrentIndex = -1;
     }
 
-    static void ReadConfig() {
+    void ReadConfig() {
         cfg.Load();
         auto playmode = cfg.GetValue<std::string>("play_mode", "local");
         g_online_player = (playmode == "online");
@@ -187,7 +186,7 @@ AsyncEventManager::GetInstance().PostToMainThread(
         g_activeThemeZip = cfg.GetValue<std::string>("active_theme_zip", "");
     }
 
-    static void LoadTheme() {
+    void LoadTheme() {
         if (!g_activeThemeZip.Get().empty()) {
             std::string id = ThemePackManager::GetInstance().LoadFromZipAbsolute(g_activeThemeZip.Get());
             if (id.empty()) {
@@ -197,7 +196,7 @@ AsyncEventManager::GetInstance().PostToMainThread(
         ThemePackManager::GetInstance().LoadActiveBackgroundTexture();
     }
 
-    static bool InitWindowPlatform(const std::string& className) {
+    bool InitWindowPlatform(const std::string& className) {
         if (!InitWindowPlat(className)) return false;
 
         WindowAnimator::Get().Init(g_hWnd);
@@ -217,7 +216,7 @@ AsyncEventManager::GetInstance().PostToMainThread(
         }
 
         WindowAnimator::Get().UpdateSide();
-        ApplyTheme(g_dark_mode.Get(), g_opacity);
+        MainUI::ApplyTheme(g_dark_mode.Get(), g_opacity);
         SetWindowAlpha(g_hWnd, 255);
 
         if (!CreateDeviceD3D(g_hWnd)) {
@@ -278,7 +277,7 @@ AsyncEventManager::GetInstance().PostToMainThread(
         IconManager::GetInstance().SetThemeColor(g_iconColor);
 
         RECT rc;
-        GetWindowRect(g_hWnd, &rc);
+        rc = GetWindowRectPlat(g_hWnd);
         g_normalWidth = rc.right - rc.left;
         g_normalHeight = rc.bottom - rc.top;
 

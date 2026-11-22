@@ -418,6 +418,7 @@ std::string PickFolderDialog(WindowHandle hwndOwner);
 
 std::string PickFileDialog(WindowHandle hwndOwner, const std::string& filter, const std::string& defaultExt);
 
+void RecreateD3DDevice(WindowHandle hWnd);
 
 // ─── WndProc（仅 Windows）───
 #if PLATFORM_WINDOWS
@@ -443,6 +444,7 @@ void LnxPollMouse();
 void LnxProcessTimers();
 void LnxPollX11Events();
 
+uint64_t GetTickCount64();
 // ─── 单实例锁 ───
 bool AcquireSingleInstanceLock();   // 返回 true=可以启动，false=已有实例
 void ReleaseSingleInstanceLock();

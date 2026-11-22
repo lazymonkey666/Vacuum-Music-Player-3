@@ -45,6 +45,8 @@
 #include <curl/curl.h>
 #include <fstream>
 
+#include <MainUI.h>
+
 #include <filesystem>  
 
 // ═══════════════════════════════════════════════════════════
@@ -1054,7 +1056,7 @@ void PrepareImGui() {
         PostMessage(g_hWnd, WM_CLOSE, 0, 0);
     });
     
-    UpdateImGuiStyle();
+    MainUI::UpdateImGuiStyle();
 
     ImGui_ImplGlfw_InitForOpenGL(g_glfwWindow, true);
     ImGui_ImplOpenGL2_Init();
@@ -1166,4 +1168,10 @@ std::string PickFileDialog(WindowHandle, const std::string& title, const std::st
 	pclose(pipe);
 	return result;
 }
+
+uint64_t GetTickCount64() {
+    return (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 #endif // PLATFORM_LINUX

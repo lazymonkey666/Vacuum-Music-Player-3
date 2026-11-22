@@ -41,7 +41,7 @@
 
 #include <PlaybackStateMachine.h>
 
-#include <APPState.h>
+#include <AppState.h>
 #include <initialize.h>
 #include <utils.h>
 #include <MainUI.h>

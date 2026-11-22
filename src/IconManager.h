@@ -30,6 +30,7 @@ public:
 
     // 释放所有纹理
     void Shutdown();
+    void OnDeviceLost();
 
 private:
     struct IconCacheEntry {

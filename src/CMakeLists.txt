@@ -37,19 +37,50 @@ set(PROJ_THIRD_PARTY ${PROJ_ROOT}/third-party)
 # --- App sources ---
 # NOTE: platform_linux.cpp is in platform/, not platform/linux/
 set(APP_SOURCES
+    # ── 入口 / 应用层 ──
     ${PROJ_APP}/main.cpp
-    ${PROJ_APP}/TagReader.cpp
-    ${PROJ_APP}/ManageConfig.cpp
-    ${PROJ_APP}/SettingItem.cpp
-    ${PROJ_APP}/AMLLWebSocketV2.cpp
+    ${PROJ_APP}/application.cpp
+    ${PROJ_APP}/initialize.cpp
+    ${PROJ_APP}/utils.cpp
+    ${PROJ_APP}/pch.cpp
+
+    # ── 播放状态机 / 视图 ──
+    ${PROJ_APP}/PlaybackStateMachine.cpp
+    ${PROJ_APP}/PlaybackView.cpp
+
+    # ── 播放核心（异步 / 服务 / 后端）──
+    ${PROJ_APP}/AsyncEventManager.cpp
+    ${PROJ_APP}/PlaybackService.cpp
+    ${PROJ_APP}/MiniaudioBackend.cpp
+    ${PROJ_APP}/SonosBackend.cpp
     ${PROJ_APP}/SonosController.cpp
-    ${PROJ_APP}/IconManager.cpp
-    ${PROJ_APP}/NeteaseAPIManager.cpp
-    ${PROJ_APP}/ThemePack.cpp
-    ${PROJ_APP}/platform/PlatformLinux.cpp
+    ${PROJ_APP}/SonosService.cpp
+
+    # ── 播放源 ──
     ${PROJ_APP}/LocalSource.cpp
     ${PROJ_APP}/NeteaseSource.cpp
+    ${PROJ_APP}/NeteaseAPIManager.cpp
 
+    # ── UI ──
+    ${PROJ_APP}/MainUI.cpp
+    ${PROJ_APP}/IconManager.cpp
+    ${PROJ_APP}/ThemePack.cpp
+    ${PROJ_APP}/WindowAnimator.cpp
+
+    # ── 元数据 ──
+    ${PROJ_APP}/TagReader.cpp
+
+    # ── 配置 ──
+    ${PROJ_APP}/ManageConfig.cpp
+    ${PROJ_APP}/SettingItem.cpp
+
+    # ── 服务（外部协议）──
+    ${PROJ_APP}/AMLLService.cpp
+    ${PROJ_APP}/AMLLWebSocketV2.cpp
+    ${PROJ_APP}/SmtcService.cpp        # ← 见下方注意事项 ①
+
+    # ── 平台层 ──
+    ${PROJ_APP}/platform/PlatformLinux.cpp
 )
 
 # --- ImGui ---
@@ -90,6 +121,29 @@ add_executable(Vacuum_Music_Player_CMAKE
 
 set_property(TARGET Vacuum_Music_Player_CMAKE PROPERTY CXX_STANDARD 20)
 set_property(TARGET Vacuum_Music_Player_CMAKE PROPERTY CXX_STANDARD_REQUIRED ON)
+
+# ═══════════════════════════════════════════════════════════
+# PCH 设置
+# ═══════════════════════════════════════════════════════════
+
+# ① 主目标启用 PCH
+target_precompile_headers(Vacuum_Music_Player_CMAKE PRIVATE
+    ${PROJ_APP}/pch.h
+)
+
+# ② main.cpp 跳过 PCH（它内部 #define MINIAUDIO_IMPLEMENTATION，需要完整重编译）
+set_source_files_properties(${PROJ_APP}/main.cpp PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+)
+
+# ③ 所有第三方源文件跳过 PCH
+set_source_files_properties(
+    ${IMGUI_SOURCES}
+    ${IXWS_SOURCES}
+    ${GENERATED_CPP}
+    PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+)
 
 # --- Include paths ---
 

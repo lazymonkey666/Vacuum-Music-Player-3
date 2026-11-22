@@ -17,6 +17,7 @@
 #include <sonossystem.h>
 #include <sonosplayer.h>
 // cpp-httplib（header-only）
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
 
 
@@ -439,7 +440,7 @@ struct SonosController::Impl {
         OutputDebugStringA("[net] localIP fallback to 127.0.0.1\n");
         return "127.0.0.1";
     }
-    bool SonosController::Impl::StartHttpServer(const PathType& musicFolder,
+    bool StartHttpServer(const PathType& musicFolder,
         const PathType& cacheFolder,
         int port) {
         if (!std::filesystem::exists(musicFolder)) {
@@ -623,41 +624,26 @@ std::vector<DeviceEntry> SonosController::SearchDevices(int totalTimeoutSec) {
     auto adapters = GetPhysicalAdapters();
     if (adapters.empty()) return {};
 
-    struct State {
-        std::mutex mtx;
-        std::vector<SonosDevice> devices;
-        std::unordered_set<std::string> locSet;
-        int pending = 0;
-    };
-    auto state = std::make_shared<State>();
-    state->pending = (int)adapters.size();
+    std::vector<SonosDevice> allDevices;
+    std::unordered_set<std::string> locSet;
 
-    std::vector<std::future<void>> tasks;
+    // ★ 串行扫网卡
     for (const auto& adp : adapters) {
         int timeout = (adp.priorityScore >= 20) ? 5 : 2;
-        tasks.push_back(std::async(std::launch::async,
-            [state, adp, timeout]() {
-                auto devs = DiscoverSonosDevices(adp.ip, timeout);
-                std::lock_guard<std::mutex> lk(state->mtx);
-                for (auto& d : devs) {
-                    if (state->locSet.insert(d.location).second) {
-                        state->devices.push_back(d);
-                    }
-                }
-                state->pending--;
-            }));
+        auto devs = DiscoverSonosDevices(adp.ip, timeout);
+        for (auto& d : devs) {
+            if (locSet.insert(d.location).second)
+                allDevices.push_back(std::move(d));
+        }
     }
 
-    // 等待所有任务完成（这里简单等待，production 中可加超时判定）
-    for (auto& t : tasks) t.wait();
-
     std::vector<DeviceEntry> entries;
-    for (size_t i = 0; i < state->devices.size(); ++i) {
+    for (size_t i = 0; i < allDevices.size(); ++i) {
         entries.push_back({
             (int)i,
-            state->devices[i].ip,
-            state->devices[i].location,
-            state->devices[i].friendlyName   // 填入设备名称
+            allDevices[i].ip,
+            allDevices[i].location,
+            allDevices[i].friendlyName
             });
     }
     return entries;

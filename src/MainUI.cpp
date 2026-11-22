@@ -121,6 +121,31 @@ namespace MainUI {
     }
 
 
+    // 根据 mode 和系统状态，算出该用深色还是浅色背景
+    bool ResolveIsDark(const std::string& mode) {
+        if (mode == "Dark")   return true;
+        if (mode == "Light")  return false;
+        return IsDarkModeByRegistry();   // System
+    }
+
+    // 应用主题（纯副作用，无返回值）
+    void ApplyTheme(const std::string& mode, int opacity) {
+        bool isDark = ResolveIsDark(mode);
+        if (isDark) {
+            EnableAcrylic(g_hWnd, (uint8_t)opacity, 0x222222);
+            g_iconColor = 0xFFFFFF;
+        }
+        else {
+            EnableAcrylic(g_hWnd, (uint8_t)opacity, 0xFFFFFF);
+            g_iconColor = 0x222222;
+        }
+    }
+
+    // 获取图标颜色（纯函数，无副作用）
+    uint32_t GetIconColorForTheme(const std::string& mode) {
+        return ResolveIsDark(mode) ? 0xFFFFFF : 0x222222;
+    }
+
     void RenderFrame(int counter, SettingWindow& settings) {
         ImGui::NewFrame();
         ImGuiIO& io = ImGui::GetIO();
@@ -144,7 +169,7 @@ namespace MainUI {
         // 如果存在封面纹理，绘制在窗口右侧（230x230）
 #if PLATFORM_LINUX
         { //linux需要背景 不然太透明了
-            bool isDark = ResolveIsDark(g_dark_mode);
+            bool isDark = ResolveIsDark(g_dark_mode.Get());
 
             // 深色：黑灰；浅色：白灰
             float bgR = isDark ? 0.10f : 0.96f;

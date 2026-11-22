@@ -244,3 +244,7 @@ void IconManager::SetThemeColor(uint32_t color) {
     }
     m_cache.clear();
 }
+
+void IconManager::OnDeviceLost() {
+    Shutdown();   // Shutdown 就是遍历 Release + clear，逻辑完全一样
+}
