@@ -43,7 +43,7 @@ struct NeteaseTrackInfo : public BaseTrackInfo {
 class NeteaseSource : public IMusicSource {
     std::vector<std::unique_ptr<NeteaseTrackInfo>> m_tracks;
     std::mutex m_loadMtx;
-    std::set<size_t> m_loadingIndices;
+    std::set<std::string> m_loadingIds;
 
     // ★ 新增缓存与同步成员
     std::string m_playlistID;
@@ -108,6 +108,7 @@ public:
     virtual ~NeteaseSource() noexcept = default;
 
     bool Init() override {
+        LoadNeteaseSettingsFromConfig();
         auto& cfg = ManageConfig::GetInstance();
         auto& api = NeteaseAPIManager::GetInstance();
 
@@ -209,6 +210,18 @@ public:
             return false;
         }
     }
+    // 按 ID 移除曲目；返回 true 表示真的删了
+    bool RemoveTrackById(const std::string& id) {
+        std::lock_guard<std::mutex> lock(m_loadMtx);
+        for (auto it = m_tracks.begin(); it != m_tracks.end(); ++it) {
+            if ((*it)->id == id) {
+                m_tracks.erase(it);
+                // ★ 索引全变，m_loadingIds 按 ID 存所以没事
+                return true;
+            }
+        }
+        return false;
+    }
 
     void SyncPlaylistAsync() override {
         if (m_playlistID.empty()) return;
@@ -240,6 +253,7 @@ public:
     }
 
     void RequestTrackDetails(size_t startIndex, size_t endIndex) override {
+        // ── 处理 pendingSync（原逻辑不变）──
         if (m_hasPendingSync.exchange(false)) {
             std::lock_guard<std::mutex> lock(m_loadMtx);
             std::unordered_map<std::string, std::unique_ptr<NeteaseTrackInfo>> oldMap;
@@ -248,7 +262,9 @@ public:
             m_tracks.clear();
             for (const auto& id : m_pendingIds) {
                 if (oldMap.find(id) != oldMap.end()) {
-                    m_tracks.push_back(std::move(oldMap[id]));
+                    auto& t = oldMap[id];
+                    if (s_skipVip && (t->fee == 1 || t->fee == 2)) continue;   // ★ 同步时也过滤
+                    m_tracks.push_back(std::move(t));
                     oldMap.erase(id);
                 }
                 else {
@@ -261,34 +277,53 @@ public:
             }
             m_pendingIds.clear();
             SaveCache();
-            PostMessage(g_hWnd, WM_APP + 6, 0, 0); // WM_PLAYLIST_UPDATED
+            PostMessage(g_hWnd, WM_PLAYLIST_UPDATED, 0, 0);
         }
 
+        // ── 收集本批要加载的曲目（按 ID 去重）──
         std::vector<std::string> idsToLoad;
-        std::vector<size_t> indicesToLoad;
+        std::vector<size_t>      indicesToLoad;
         {
             std::lock_guard<std::mutex> lock(m_loadMtx);
             for (size_t i = startIndex; i < endIndex && i < m_tracks.size(); ++i) {
                 if (!m_tracks[i]->isDetailLoaded && m_tracks[i]->retryCount < 3 &&
-                    m_loadingIndices.find(i) == m_loadingIndices.end()) {
+                    m_loadingIds.find(m_tracks[i]->id) == m_loadingIds.end()) {
                     idsToLoad.push_back(m_tracks[i]->id);
                     indicesToLoad.push_back(i);
-                    m_loadingIndices.insert(i);
+                    m_loadingIds.insert(m_tracks[i]->id);
                 }
             }
         }
-
         if (idsToLoad.empty()) return;
 
+        // ── 异步拉详情 ──
         std::thread([this, idsToLoad, indicesToLoad]() {
+            std::vector<std::string> toRemove;
             bool needUpdateCache = false;
+
             try {
                 auto details = NeteaseAPIManager::GetInstance().GetSongsDetail(idsToLoad);
+
                 std::lock_guard<std::mutex> lock(m_loadMtx);
                 for (size_t i = 0; i < details.size() && i < indicesToLoad.size(); ++i) {
                     size_t idx = indicesToLoad[i];
-                    const auto& s = details[i];
+                    const std::string& expectId = idsToLoad[i];
 
+                    // ★ 校验：idx 位置还是不是这首（可能被上一批删除移走了）
+                    if (idx >= m_tracks.size() || m_tracks[idx]->id != expectId) {
+                        // 索引已失效，尝试按 ID 重定位（成本低，只在失效时走）
+                        bool found = false;
+                        for (size_t j = 0; j < m_tracks.size(); ++j) {
+                            if (m_tracks[j]->id == expectId) { idx = j; found = true; break; }
+                        }
+                        if (!found) {
+                            // 这首歌已经不在列表里（被删了），直接跳过
+                            m_loadingIds.erase(expectId);
+                            continue;
+                        }
+                    }
+
+                    const auto& s = details[i];
                     m_tracks[idx]->title = s.name;
                     m_tracks[idx]->album = s.album;
                     m_tracks[idx]->albumArtUrl = s.albumArtUrl;
@@ -303,20 +338,43 @@ public:
 
                     std::string prefix = (s.fee == 1 || s.fee == 2) ? "[VIP] " : "";
                     m_tracks[idx]->displayName = prefix + s.name + " - " + artistsStr;
-
                     m_tracks[idx]->isDetailLoaded = true;
-                    m_loadingIndices.erase(idx);
+                    m_loadingIds.erase(expectId);
                     needUpdateCache = true;
+
+                    // ★ 关键：详情加载完才知道是 VIP → 标记删除
+                    if (s_skipVip && (s.fee == 1 || s.fee == 2)) {
+                        toRemove.push_back(expectId);
+                    }
                 }
             }
             catch (...) {
                 std::lock_guard<std::mutex> lock(m_loadMtx);
-                for (size_t idx : indicesToLoad) {
-                    m_loadingIndices.erase(idx);
-                    m_tracks[idx]->retryCount++;
+                for (size_t i = 0; i < idsToLoad.size(); ++i) {
+                    m_loadingIds.erase(idsToLoad[i]);
+                    if (indicesToLoad[i] < m_tracks.size() &&
+                        m_tracks[indicesToLoad[i]]->id == idsToLoad[i]) {
+                        m_tracks[indicesToLoad[i]]->retryCount++;
+                    }
                 }
             }
-            if (needUpdateCache) SaveCache();
+
+            // ── 删除收集到的 VIP（一次性、从 ID 删，不依赖旧索引）──
+            if (!toRemove.empty()) {
+                std::lock_guard<std::mutex> lock(m_loadMtx);
+                for (const auto& id : toRemove) {
+                    for (auto it = m_tracks.begin(); it != m_tracks.end(); ++it) {
+                        if ((*it)->id == id) { m_tracks.erase(it); break; }
+                    }
+                }
+                if (needUpdateCache) SaveCache();
+
+                // ★ 通知主线程：列表变了，重算索引
+                if (g_hWnd) PostMessage(g_hWnd, WM_PLAYLIST_UPDATED, 0, 0);
+            }
+            else if (needUpdateCache) {
+                SaveCache();
+            }
             }).detach();
     }
 
@@ -418,9 +476,14 @@ public:
         return newIdx;
     }
 
-    size_t GetCount() const override { return m_tracks.size(); }
-    const BaseTrackInfo* GetBaseTrack(size_t index) const override { return m_tracks[index].get(); }
-
+    size_t GetCount() const override {
+        std::lock_guard<std::mutex> lock(const_cast<NeteaseSource*>(this)->m_loadMtx);
+        return m_tracks.size();
+    }
+    const BaseTrackInfo* GetBaseTrack(size_t index) const override {
+        if (index >= m_tracks.size()) return nullptr;   // ★ 必须加
+        return m_tracks[index].get();
+    }
     PlaybackInfo PreparePlayback(size_t index) override {
         PlaybackInfo info;
         if (index >= m_tracks.size()) return info;
@@ -450,7 +513,6 @@ public:
 
         if (s_skipVip && (t->fee == 1 || t->fee == 2)) {
             info.isValid = false;
-            OutputDebugStringA("[NeteaseSource] 拦截并跳过 VIP 歌曲\n");
             return info;
         }
 

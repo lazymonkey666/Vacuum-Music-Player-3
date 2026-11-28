@@ -25,6 +25,23 @@ extern void UpdateCurrentPlaying(int new_index);
 extern void AutoPlayNextSong();
 extern void RegisterAsyncHooks();
 
+// ═══════════════════════════════════════════════════════════
+// 颜色插值（HSL 色相最短弧，视觉效果优于 RGB 线性）
+// ═══════════════════════════════════════════════════════════
+namespace {
+
+    uint32_t LerpColorRGB(uint32_t a, uint32_t b, float t) {
+        t = std::clamp(t, 0.0f, 1.0f);
+        auto mix = [t](uint8_t x, uint8_t y) -> uint32_t {
+            return (uint32_t)((float)x + ((float)y - (float)x) * t + 0.5f);
+            };
+        uint32_t ar = (a >> 16) & 0xFF, ag = (a >> 8) & 0xFF, ab = a & 0xFF;
+        uint32_t br = (b >> 16) & 0xFF, bg = (b >> 8) & 0xFF, bb = b & 0xFF;
+        return (mix(ar, br) << 16) | (mix(ag, bg) << 8) | mix(ab, bb);
+    }
+
+} // namespace
+
 Application& Application::Get() {
     static Application inst;
     return inst;
@@ -162,21 +179,20 @@ int Application::Run(int argc, char** argv) {
 
     g_sm.onStateChanged = []() {
         const auto& s = g_sm.Snap();
+
         static std::vector<unsigned char> lastArt;
         if (s.albumArt != lastArt) {
             lastArt = s.albumArt;
             MainUI::ScheduleAlbumArtUpdate();
         }
 
-        // ★ 强调色：直接读 snapshot，零线程、零判重
-        static uint32_t lastAccent = 0;
+        // ★ 专辑色：只记录目标，实际过渡在主循环推进
         if (g_enable_album_accent
             && !ThemePackManager::GetInstance().GetActive()
-            && s.dominantColor != lastAccent) {
-            lastAccent = s.dominantColor;
-            g_albumAccentRaw = s.dominantColor;
-            g_accentFromAlbum = true;                   // ★
-            MainUI::UpdateImGuiStyle();   // 或直接 MainUI::UpdateImGuiStyle();
+            && s.dominantColor != 0)
+        {
+            g_albumAccentTarget = s.dominantColor;
+            g_albumAccentTargetValid = true;
         }
         };
 
@@ -245,6 +261,74 @@ int Application::MainLoop() {
             DispatchMessage(&msg);
 #endif
             continue;
+        }
+        // ═══════════════════════════════════════════════════════════
+// 专辑色渐变推进（每帧）
+// ═══════════════════════════════════════════════════════════
+        {
+            static uint32_t s_fromColor = 0;
+            static uint32_t s_toColor = 0;
+            static float    s_lerpT = 1.0f;
+            static bool     s_animating = false;
+            static auto     s_lastTick = std::chrono::steady_clock::now();
+            static auto     s_lastAcrylic = std::chrono::steady_clock::now();
+
+            constexpr float kTransitionSec = 0.45f;   // 过渡时长
+            constexpr int   kAcrylicThrottleMs = 150;     // acrylic 节流
+
+            // ① 检测新目标 → 启动过渡
+            if (g_albumAccentTargetValid.Get()
+                && g_enable_album_accent
+                && !ThemePackManager::GetInstance().GetActive())
+            {
+                uint32_t target = g_albumAccentTarget.Get();
+                if (target != 0 && target != s_toColor) {
+                    s_fromColor = g_albumAccentRaw.Get();           // 从当前显示色起
+                    if (s_fromColor == 0) s_fromColor = target;     // 首次：无渐变
+                    s_toColor = target;
+                    s_lerpT = 0.0f;
+                    s_animating = true;
+                }
+            }
+
+            // ② 推进插值
+            if (s_animating) {
+                auto now = std::chrono::steady_clock::now();
+                float dt = std::chrono::duration<float>(now - s_lastTick).count();
+                s_lastTick = now;
+                if (dt <= 0.0f || dt > 0.2f) dt = 1.0f / 60.0f;     // 防大跳
+
+                s_lerpT += dt / kTransitionSec;
+                if (s_lerpT >= 1.0f) {
+                    s_lerpT = 1.0f;
+                    s_animating = false;
+                }
+
+                // ★ 关键：把插值后的颜色写回 g_albumAccentRaw
+                g_albumAccentRaw = LerpColorRGB(s_fromColor, s_toColor, s_lerpT);
+                g_accentFromAlbum = true;
+                MainUI::UpdateImGuiStyle();
+
+                // ③ acrylic 背景：节流更新（走 DWM，贵）
+                if (!s_animating
+                    || std::chrono::duration_cast<std::chrono::milliseconds>(now - s_lastAcrylic).count() >= kAcrylicThrottleMs)
+                {
+                    s_lastAcrylic = now;
+                    MainUI::ApplyTheme(g_dark_mode.Get(), g_opacity);
+                }
+            }
+        }
+
+        if (g_needRestyleAccent) {
+            g_needRestyleAccent = false;
+            MainUI::UpdateImGuiStyle();
+
+            static auto lastAcrylic = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastAcrylic).count() > 300) {
+                lastAcrylic = now;
+                MainUI::ApplyTheme(g_dark_mode.Get(), g_opacity);
+            }
         }
 
         if (g_needUpdateStyle) {

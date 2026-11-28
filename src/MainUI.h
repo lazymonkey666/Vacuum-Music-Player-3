@@ -54,4 +54,5 @@ namespace MainUI {
     uint32_t GetIconColorForTheme(const std::string& mode);
     void OnAlbumArtReady(AlbumArtAsyncResult* result);
     void ScheduleAlbumArtUpdate();
+    uint32_t DeriveAcrylicBg(const ImVec4& accent, bool isDark);
 }

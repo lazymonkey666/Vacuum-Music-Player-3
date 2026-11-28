@@ -54,6 +54,50 @@ namespace MainUI {
         return ImVec4(r, g, b, a);
     }
 
+    uint32_t DeriveAcrylicBg(const ImVec4& accent, bool isDark) {
+        auto clamp01 = [](float x) { return std::clamp(x, 0.0f, 1.0f); };
+        float r, g, b;
+
+        if (isDark) {
+            // 暗底 + 55% 的 accent 色相
+            // 红色 (1,0,0) → (0.65, 0.10, 0.10)，暗红但看得出是红
+            constexpr float kBase = 0.10f;
+            constexpr float kAccent = 0.55f;
+            r = kBase + accent.x * kAccent;
+            g = kBase + accent.y * kAccent;
+            b = kBase + accent.z * kAccent;
+        }
+        else {
+            // 亮底 + accent 相对白色的"下拉"45%
+            // 红色 (1,0,0) → (1.0, 0.72, 0.72)，淡粉但色相明确
+            constexpr float kBase = 0.94f;
+            constexpr float kPull = 0.45f;
+            r = kBase + (accent.x - 0.5f) * kPull;
+            g = kBase + (accent.y - 0.5f) * kPull;
+            b = kBase + (accent.z - 0.5f) * kPull;
+        }
+
+        uint8_t R = (uint8_t)(clamp01(r) * 255);
+        uint8_t G = (uint8_t)(clamp01(g) * 255);
+        uint8_t B = (uint8_t)(clamp01(b) * 255);
+        return ((uint32_t)B << 16) | ((uint32_t)G << 8) | R;   // BBGGRR
+    }
+
+    // 为 ImGui 控件派生"弱化版" accent：
+    static ImVec4 WeakenAccentForUI(const ImVec4& accent, bool isDark) {
+        // 暗色：目标灰 0.20，混合比 35%
+        // 亮色：目标灰 0.85，混合比 30%
+        const float gray = isDark ? 0.20f : 0.85f;
+        const float kMix = isDark ? 0.35f : 0.30f;
+
+        return ImVec4(
+            gray + (accent.x - gray) * kMix,
+            gray + (accent.y - gray) * kMix,
+            gray + (accent.z - gray) * kMix,
+            1.0f
+        );
+    }
+
 
     TextureHandle GetIcon(const std::string& name) {
         auto it = g_iconCache.find(name);
@@ -128,18 +172,26 @@ namespace MainUI {
         return IsDarkModeByRegistry();   // System
     }
 
+
+
     // 应用主题（纯副作用，无返回值）
     void ApplyTheme(const std::string& mode, int opacity) {
         bool isDark = ResolveIsDark(mode);
-        if (isDark) {
-            EnableAcrylic(g_hWnd, (uint8_t)opacity, 0x222222);
-            g_iconColor = 0xFFFFFF;
+
+        uint32_t bg;
+        if (g_enable_album_accent
+            && g_accentFromAlbum
+            && !ThemePackManager::GetInstance().GetActive()) {
+            bg = DeriveAcrylicBg(g_accent, isDark);       // ★ 专辑氛围底
         }
         else {
-            EnableAcrylic(g_hWnd, (uint8_t)opacity, 0xFFFFFF);
-            g_iconColor = 0x222222;
+            bg = isDark ? 0x222222 : 0xFFFFFF;            // 默认黑白
         }
+
+        EnableAcrylic(g_hWnd, (uint8_t)opacity, bg);
+        g_iconColor = isDark ? 0xFFFFFF : 0x222222;
     }
+
 
     // 获取图标颜色（纯函数，无副作用）
     uint32_t GetIconColorForTheme(const std::string& mode) {
@@ -240,29 +292,58 @@ namespace MainUI {
         ImVec2 winPos = ImGui::GetWindowPos();
         // 如果存在封面纹理，绘制在窗口右侧（230x230）
 #if PLATFORM_LINUX
-        { //linux需要背景 不然太透明了
+        { // Linux 无 DWM 亚克力，用半透明背板模拟；跟随专辑色
             bool isDark = ResolveIsDark(g_dark_mode.Get());
 
-            // 深色：黑灰；浅色：白灰
-            float bgR = isDark ? 0.10f : 0.96f;
-            float bgG = isDark ? 0.10f : 0.96f;
-            float bgB = isDark ? 0.12f : 0.98f;
+            float bgR, bgG, bgB;
 
-            // 透明度：g_opacity [0, 255]  alpha [0.0, 1.0]
+            bool albumAccent = g_enable_album_accent
+                && g_accentFromAlbum
+                && !ThemePackManager::GetInstance().GetActive();
+
+            if (albumAccent) {
+                // 与 Windows 版 DeriveAcrylicBg 同逻辑
+                const auto& a = g_accent;
+                if (isDark) {
+                    constexpr float kBase = 0.10f;
+                    constexpr float kAccent = 0.55f;
+                    bgR = kBase + a.x * kAccent;
+                    bgG = kBase + a.y * kAccent;
+                    bgB = kBase + a.z * kAccent;
+                }
+                else {
+                    constexpr float kBase = 0.94f;
+                    constexpr float kPull = 0.45f;
+                    bgR = kBase + (a.x - 0.5f) * kPull;
+                    bgG = kBase + (a.y - 0.5f) * kPull;
+                    bgB = kBase + (a.z - 0.5f) * kPull;
+                }
+                bgR = std::clamp(bgR, 0.0f, 1.0f);
+                bgG = std::clamp(bgG, 0.0f, 1.0f);
+                bgB = std::clamp(bgB, 0.0f, 1.0f);
+            }
+            else {
+                // 系统色 / 主题包：保持原黑白灰
+                bgR = isDark ? 0.10f : 0.96f;
+                bgG = isDark ? 0.10f : 0.96f;
+                bgB = isDark ? 0.12f : 0.98f;
+            }
+
             float alpha = g_opacity / 255.0f;
-            if (alpha < 0.00f) alpha = 0.00f;   // 下限，避免完全看不见
+            if (alpha < 0.00f) alpha = 0.00f;
             if (alpha > 1.00f) alpha = 1.00f;
+
+            // 专辑色时透明度下限抬一点，避免"糊成一片"
+            if (albumAccent) alpha = (std::max)(alpha, 0.65f);
 
             ImU32 bgColor = ImGui::GetColorU32(ImVec4(bgR, bgG, bgB, alpha));
 
-            // 铺满整个窗口，圆角 0px
             ImVec2 pMin = winPos;
             ImVec2 pMax = ImVec2(winPos.x + winSize.x, winPos.y + winSize.y);
             float rounding = 0.0f;
 
             draw_list->AddRectFilled(pMin, pMax, bgColor, rounding);
 
-            // 可选：细边框（深浅色适配）
             float borderAlpha = alpha * 0.6f;
             ImU32 borderColor = ImGui::GetColorU32(
                 isDark ? ImVec4(1.0f, 1.0f, 1.0f, borderAlpha * 0.15f)
@@ -934,6 +1015,8 @@ namespace MainUI {
             g_accent = ConvertToImVec4(GetAccentColorFromRegistry());
         }
         auto accent = g_accent;
+        if (g_enable_album_accent){ auto accentUI = WeakenAccentForUI(accent, isDark); }
+
 
         if (isDark) {
             // 深色主题基础色
@@ -1046,6 +1129,62 @@ namespace MainUI {
             style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(0.50f, 0.50f, 0.55f, 0.70f);
             style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.40f);
             style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.40f);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 专辑取色：只染"基底色"（黑/白），强调色保持原 accent
+        // ═══════════════════════════════════════════════════════════
+        if (g_enable_album_accent && g_accentFromAlbum) {
+            // 把 baseGray 向 accent 的"色调方向"轻微偏移
+            auto tint = [&](float baseGray) -> ImVec4 {
+                constexpr float k = 0.08f;   // 强度：0.04 极轻 ~ 0.15 明显
+                auto c = [&](float v, float a) {
+                    return std::clamp(baseGray + (a - 0.5f) * k, 0.0f, 1.0f);
+                    };
+                return ImVec4(c(baseGray, accent.x),
+                    c(baseGray, accent.y),
+                    c(baseGray, accent.z),
+                    1.0f);
+                };
+
+            if (isDark) {
+                auto bg = tint(0.07f);
+                style.Colors[ImGuiCol_WindowBg] = ImVec4(bg.x, bg.y, bg.z, 0.94f);
+
+                auto child = tint(0.05f);
+                style.Colors[ImGuiCol_ChildBg] = ImVec4(child.x, child.y, child.z, 0.20f);
+
+                auto popup = tint(0.08f);
+                style.Colors[ImGuiCol_PopupBg] = ImVec4(popup.x, popup.y, popup.z, 0.94f);
+
+                auto title = tint(0.08f);
+                style.Colors[ImGuiCol_TitleBg] = ImVec4(title.x, title.y, title.z, 1.00f);
+
+                auto titleA = tint(0.12f);
+                style.Colors[ImGuiCol_TitleBgActive] = ImVec4(titleA.x, titleA.y, titleA.z, 1.00f);
+
+                auto menu = tint(0.10f);
+                style.Colors[ImGuiCol_MenuBarBg] = ImVec4(menu.x, menu.y, menu.z, 1.00f);
+            }
+            else {
+                auto bg = tint(0.96f);
+                style.Colors[ImGuiCol_WindowBg] = ImVec4(bg.x, bg.y, bg.z, 0.94f);
+
+                auto child = tint(0.98f);
+                style.Colors[ImGuiCol_ChildBg] = ImVec4(child.x, child.y, child.z, 0.20f);
+
+                auto popup = tint(0.98f);
+                style.Colors[ImGuiCol_PopupBg] = ImVec4(popup.x, popup.y, popup.z, 0.98f);
+
+                auto title = tint(0.92f);
+                style.Colors[ImGuiCol_TitleBg] = ImVec4(title.x, title.y, title.z, 1.00f);
+
+                auto titleA = tint(0.88f);
+                style.Colors[ImGuiCol_TitleBgActive] = ImVec4(titleA.x, titleA.y, titleA.z, 1.00f);
+
+                auto menu = tint(0.94f);
+                style.Colors[ImGuiCol_MenuBarBg] = ImVec4(menu.x, menu.y, menu.z, 1.00f);
+            }
         }
 
         // 3. 可选的全局样式调整

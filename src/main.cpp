@@ -318,17 +318,31 @@ bool HandleAppMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
 
     case WM_PLAYLIST_UPDATED:
         if (g_source) {
-            int targetIdx = -1;
             const std::string& curId = g_sm.Snap().trackId;
-            if (!curId.empty()) {
-                targetIdx = g_source->FindTrackIndex(curId);
+
+            // 1. 正在播的歌被删掉了？
+            if (!curId.empty() && g_source->FindTrackIndex(curId) < 0) {
+                int count = (int)g_source->GetCount();
+                if (count == 0) {
+                    g_sm.Stop();
+                    CurrentIndex = -1;
+                }
+                else {
+                    // 保持"下一个位置"作为新目标
+                    int nextIdx = CurrentIndex;
+                    if (nextIdx < 0 || nextIdx >= count) nextIdx = 0;
+                    g_sm.Stop();
+                    UpdateCurrentPlaying(nextIdx);
+                }
+                return true;
             }
-            else {
-                // ★ 初始化时 g_currentPlayingTrackId 还是空：用 cfg 里的 last 兜底
-                targetIdx = g_source->GetLastIndex();
-            }
+
+            // 2. 未播的歌被删（索引偏移）→ 按 ID 找回
+            int targetIdx = curId.empty()
+                ? g_source->GetLastIndex()
+                : g_source->FindTrackIndex(curId);
             if (targetIdx >= 0 && targetIdx != CurrentIndex) {
-                CurrentIndex = targetIdx;
+                CurrentIndex = targetIdx;   // 只更新索引，不重新 Play
             }
         }
         return true;

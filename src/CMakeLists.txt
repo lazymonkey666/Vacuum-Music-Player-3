@@ -163,6 +163,7 @@ target_include_directories(Vacuum_Music_Player_CMAKE PRIVATE
 target_compile_definitions(Vacuum_Music_Player_CMAKE PRIVATE
     PLATFORM_LINUX=1
     IXWEBSOCKET_USE_OPEN_SSL
+    CPPHTTPLIB_OPENSSL_SUPPORT 
 )
 
 # --- Version config ---
